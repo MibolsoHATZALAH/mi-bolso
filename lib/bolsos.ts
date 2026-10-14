@@ -13,8 +13,8 @@ import { fb } from "./firebase";
 import { emptyBolso, type Bolso, type Movimiento } from "./inventory";
 import type { Store } from "./data";
 
-/** Always allowed in, with the management role. Keep in sync with ADMINS in firestore.rules. */
-export const ADMINS = ["urielchirazi@gmail.com"];
+import { ADMINS } from "./config";
+export { ADMINS };
 
 export type Rol = "voluntario" | "gerencia";
 export type Acceso = { estado: "cargando" } | { estado: "pendiente" } | { estado: "miembro"; rol: Rol };

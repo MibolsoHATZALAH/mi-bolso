@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Mi Bolso Paramédico",
   description: "Inventario del bolso de paramédicos: faltantes, usos en emergencias, reposiciones e historial.",
   appleWebApp: { capable: true, title: "Mi Bolso", statusBarStyle: "default" },
+  manifest: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/manifest.webmanifest`,
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#0E5568" };
 

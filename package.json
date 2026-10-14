@@ -2,13 +2,14 @@
   "name": "mi-bolso",
   "version": "2.0.0",
   "private": true,
-  "description": "Inventario personal del bolso de paramédicos (Next.js + Firebase)",
+  "description": "Inventario personal del bolso de param\u00e9dicos (Next.js + Firebase)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --test --experimental-strip-types tests/inventory.test.ts"
+    "test": "node --test --experimental-strip-types tests/inventory.test.ts tests/alarmas.test.ts",
+    "alarmas": "node --experimental-strip-types scripts/alarmas.ts"
   },
   "dependencies": {
     "firebase": "11.10.0",
@@ -20,6 +21,7 @@
     "@types/node": "20.14.10",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
+    "firebase-admin": "^13.4.0",
     "typescript": "5.5.4"
   }
 }

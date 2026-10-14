@@ -1,0 +1,13 @@
+// Settings shared by the app and the daily alarm job (scripts/alarmas.ts). No Firebase imports here.
+
+/** Always allowed into the shared bags, with the management role. Keep in sync with admin() in firestore.rules. */
+export const ADMINS = ["urielchirazi@gmail.com"];
+
+/** Public address of the published app (GitHub Pages). */
+export const APP_URL = "https://mibolsohatzalah.github.io/mi-bolso";
+
+/** Hours between "this bag has missing items" alarms. */
+export const FALTANTES_CADA_HORAS = 48;
+
+/** Public "Web Push certificate" key of the Firebase project (Cloud Messaging). Public by design. */
+export const VAPID_KEY = "BBx-Oso7SaBkdUr7Tspdmy1hAdCOO8VqFqYr7jknams10KU1KldqoyiwWw_hT9RcHF8pBo0JsZpnf7cqNlGji_8";

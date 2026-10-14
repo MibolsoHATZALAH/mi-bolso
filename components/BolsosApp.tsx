@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut, type User } from "firebase/auth";
 import { fb } from "@/lib/firebase";
-import { buildCopyTextVarios, resumen, type Bolso } from "@/lib/inventory";
+import { alertasVenc, buildCopyTextVarios, resumen, type Bolso } from "@/lib/inventory";
 import {
   ADMINS, agregarMiembro, aprobar, bolsoStore, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
   quitarMiembro, rechazar, subscribeAcceso, subscribeBolsos, subscribeEquipo, subscribeSolicitudes,
@@ -10,6 +10,7 @@ import {
 } from "@/lib/bolsos";
 import InventoryApp from "./InventoryApp";
 import { UserChip } from "./Login";
+import AlarmasPush from "./AlarmasPush";
 
 const STALE_DAYS = 30; // a bag nobody has checked in this long gets flagged
 type Vista = { k: "lista" } | { k: "bolso"; id: string } | { k: "equipo" };
@@ -100,7 +101,7 @@ function BolsosApp({ user, rol }: { user: User; rol: Rol }) {
     <>
       {vista.k === "equipo" && gerencia
         ? <Equipo user={user} solicitudes={solicitudes} chip={chip} onBack={() => ir({ k: "lista" })} toast={toast} />
-        : <Lista bolsos={bolsos} gerencia={gerencia} pendientes={solicitudes.length} chip={chip}
+        : <Lista bolsos={bolsos} gerencia={gerencia} pendientes={solicitudes.length} chip={chip} alarmas={<AlarmasPush user={user} app="bolsos" />}
             onOpen={(id) => ir({ k: "bolso", id })} onEquipo={() => ir({ k: "equipo" })} toast={toast} />}
       <div className={`toast ${toastMsg ? "show" : ""}`} role="status">{toastMsg}</div>
     </>
@@ -148,19 +149,19 @@ function BolsoView({ b, user, gerencia, chip, onBack, toast }: {
       back={{ label: "Todos los bolsos", onClick: onBack }}
       canEditList={gerencia} editExtra={editExtra} copyTitle={b.nombre}
       savedText={b.actualizado ? `Revisado ${hace(b.actualizado)}${b.por ? ` por ${b.por}` : ""} · lo ve todo el equipo` : "Lo que cargues lo ve todo el equipo"}
-      loadingText="Cargando el bolso…" tabKey="bolsos-tab"
+      loadingText="Cargando el bolso…" tabKey="bolsos-tab" bandExtra={<AlarmasPush user={user} app="bolsos" />}
     />
   );
 }
 
 /* ---------- List of bags = state of every bag ---------- */
-function Lista({ bolsos, gerencia, pendientes, chip, onOpen, onEquipo, toast }: {
-  bolsos: BolsoInst[]; gerencia: boolean; pendientes: number; chip: React.ReactNode;
+function Lista({ bolsos, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, toast }: {
+  bolsos: BolsoInst[]; gerencia: boolean; pendientes: number; chip: React.ReactNode; alarmas: React.ReactNode;
   onOpen: (id: string) => void; onEquipo: () => void; toast: (m: string) => void;
 }) {
   const [nuevo, setNuevo] = useState(false);
   const [copyFallback, setCopyFallback] = useState("");
-  const datos = useMemo(() => bolsos.map((b) => ({ b, r: resumen(b.bolso) })), [bolsos]);
+  const datos = useMemo(() => bolsos.map((b) => ({ b, r: resumen(b.bolso), av: alertasVenc(b.bolso) })), [bolsos]);
   const conFaltantes = datos.filter((x) => x.r.cargados && x.r.faltan).length;
   const sinCargar = datos.filter((x) => !x.r.cargados).length;
   const ok = datos.filter((x) => x.r.cargados && !x.r.faltan).length;
@@ -183,6 +184,7 @@ function Lista({ bolsos, gerencia, pendientes, chip, onOpen, onEquipo, toast }: 
           <div className="tile ok"><b className="num">{ok}</b><span>Completos</span></div>
           <div className="tile"><b className="num">{sinCargar}</b><span>Sin cargar</span></div>
         </div>
+        {alarmas}
       </header>
 
       {gerencia && (
@@ -207,7 +209,7 @@ function Lista({ bolsos, gerencia, pendientes, chip, onOpen, onEquipo, toast }: 
       )}
 
       <ul className="bags">
-        {datos.map(({ b, r }) => {
+        {datos.map(({ b, r, av }) => {
           const dias = diasDesde(b.actualizado);
           const viejo = r.cargados > 0 && dias !== null && dias >= STALE_DAYS;
           const estado = !r.cargados ? "none" : r.faltan ? "bad" : r.atencion ? "warn" : "ok";
@@ -221,6 +223,8 @@ function Lista({ bolsos, gerencia, pendientes, chip, onOpen, onEquipo, toast }: 
                     {!r.cargados && <span className="pill none">Sin cargar</span>}
                     {r.cargados > 0 && r.faltan > 0 && <span className="pill bad">{r.faltan === 1 ? "1 faltante" : `${r.faltan} faltantes`}</span>}
                     {r.cargados > 0 && !r.faltan && <span className="pill ok">Completo</span>}
+                    {av.some((a) => a.dias < 0) && <span className="pill bad">{av.filter((a) => a.dias < 0).length} vencido{av.filter((a) => a.dias < 0).length > 1 ? "s" : ""}</span>}
+                    {av.some((a) => a.dias >= 0) && <span className="pill warn">{av.filter((a) => a.dias >= 0).length} por vencer</span>}
                     {r.atencion > 0 && <span className="pill warn">{r.atencion} atención</span>}
                     {r.cargados > 0 && r.cargados < r.total && <span className="pill info">{r.cargados}/{r.total} cargados</span>}
                     {viejo && <span className="pill warn">Sin revisar hace {dias} días</span>}

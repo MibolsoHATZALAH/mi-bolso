@@ -112,9 +112,10 @@ export function statusOf(b: Bolso, it: Item, c: Categoria, now = new Date()): St
   const v = b.valores[it.id] ?? null;
   if (v === "NO") return { level: "bad", motivo: "Falta" };
   if (v === "BAJO") return { level: "bad", motivo: "Carga baja" };
-  if (dd !== null && dd < 0 && v) return { level: "bad", motivo: "Vencido" };
+  // a loaded expiry date counts even if SÍ wasn't tapped yet (same rule as the expiry alarm)
+  if (dd !== null && dd < 0) return { level: "bad", motivo: "Vencido" };
   if (v === "MEDIO") return { level: "warn", motivo: "Carga media" };
-  if (dd !== null && dd <= WARN_DAYS && v) return { level: "warn", motivo: dd === 0 ? "Vence hoy" : `Vence en ${dd} d` };
+  if (dd !== null && dd <= WARN_DAYS) return { level: "warn", motivo: dd === 0 ? "Vence hoy" : `Vence en ${dd} d` };
   if (!v) return { level: "none", motivo: "Sin cargar" };
   return { level: "ok", motivo: "" };
 }
@@ -295,3 +296,22 @@ export function buildCopyTextVarios(bolsos: { nombre: string; ubicacion?: string
   if (sinCargar.length) t += `\nTodavía sin inventariar: ${sinCargar.join(", ")}\n`;
   return t.trim();
 }
+
+/* ---------- Expiry alarm ---------- */
+export type AlertaVenc = { s: Seccion; c: Categoria; it: Item; venc: string; dias: number };
+/** Items with an expiry date that is past or within WARN_DAYS. Items not in the bag (0 / NO) don't count. */
+export function alertasVenc(b: Bolso, now = new Date()): AlertaVenc[] {
+  const out: AlertaVenc[] = [];
+  for (const s of b.catalog.secciones) for (const c of s.categorias) {
+    if (!c.vence) continue;
+    for (const it of c.items) {
+      const venc = b.venc[it.id]; if (!venc) continue;
+      const dias = daysTo(venc, now); if (dias === null || dias > WARN_DAYS) continue;
+      if (it.tipo === "cant" ? b.cant[it.id] === 0 : b.valores[it.id] === "NO") continue;
+      out.push({ s, c, it, venc, dias });
+    }
+  }
+  return out.sort((x, y) => x.dias - y.dias);
+}
+export const textoVenc = (a: { dias: number }) =>
+  a.dias < 0 ? (a.dias === -1 ? "venció ayer" : `vencido hace ${-a.dias} días`) : a.dias === 0 ? "vence hoy" : a.dias === 1 ? "vence mañana" : `vence en ${a.dias} días`;

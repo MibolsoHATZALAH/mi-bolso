@@ -1,0 +1,40 @@
+# Daily alarms: expired / expiring medicines (every day) and missing items in shared bags (every 48 h).
+# Runs at 9:00 Buenos Aires (12:00 UTC). "Run workflow" in the Actions tab runs it by hand.
+name: Alarmas
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+    inputs:
+      prueba:
+        description: "Sólo mostrar qué se mandaría, sin enviar"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: write # keep the schedule alive (GitHub pauses schedules after 60 days without commits)
+
+concurrency: alarmas
+
+jobs:
+  alarmas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Revisar bolsos y mandar alarmas
+        run: node --experimental-strip-types scripts/alarmas.ts ${{ inputs.prueba && '--dry-run' || '' }}
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Mantener activo el horario
+        if: always()
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/alarmas.yml/enable" || true
+        env:
+          GH_TOKEN: ${{ github.token }}

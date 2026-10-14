@@ -5,6 +5,7 @@ import { fb } from "@/lib/firebase";
 import { ensureProfile, personalStore } from "@/lib/data";
 import InventoryApp from "@/components/InventoryApp";
 import Login, { UserChip, useUser } from "@/components/Login";
+import AlarmasPush from "@/components/AlarmasPush";
 
 export default function Page() {
   const user = useUser((u) => { ensureProfile(u).catch(() => {}); });
@@ -13,5 +14,5 @@ export default function Page() {
   if (user === undefined) return <div className="splash">Cargando…</div>;
   if (!user || !store) return <Login title="Mi Bolso" text="Inventario de tu bolso de paramédico: lo que falta, lo que usaste en cada emergencia y lo que repusiste." />;
 
-  return <InventoryApp store={store} title="Mi Bolso" top={<UserChip user={user} onSignOut={() => signOut(fb().auth)} />} />;
+  return <InventoryApp store={store} title="Mi Bolso" top={<UserChip user={user} onSignOut={() => signOut(fb().auth)} />} bandExtra={<AlarmasPush user={user} app="personal" />} />;
 }

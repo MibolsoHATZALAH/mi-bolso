@@ -9,6 +9,7 @@ import type { MovIn, Store } from "@/lib/data";
 import { Options, Stepper } from "./Controls";
 import Sheet from "./Sheet";
 import History from "./History";
+import AlarmaVenc from "./AlarmaVenc";
 
 const AJUSTE_WINDOW = 5 * 60_000; // manual edits within 5 min are grouped in one history entry
 const PAGE = 50;
@@ -30,11 +31,13 @@ type Props = {
   savedText?: string;
   loadingText?: string;
   tabKey?: string;
+  /** Extra row at the bottom of the status band (push alarms). */
+  bandExtra?: ReactNode;
 };
 
 export default function InventoryApp({
   store, title, top, back, subtitle, canEditList = true, editExtra, copyTitle,
-  savedText = "Guardado en tu cuenta", loadingText = "Cargando tu bolso…", tabKey = "mibolso-tab",
+  savedText = "Guardado en tu cuenta", loadingText = "Cargando tu bolso…", tabKey = "mibolso-tab", bandExtra,
 }: Props) {
   const [bolso, setBolso] = useState<Bolso | null>(null);
   const [movs, setMovs] = useState<Movimiento[]>([]);
@@ -140,7 +143,10 @@ export default function InventoryApp({
             <div className="tile"><b className="num">{cargados}/{all.length}</b><span>Cargados</span></div>
           </div>
           <div className="sync" style={{ marginTop: 6 }}>{online ? savedText : "Sin conexión: se guarda en el celular y se sincroniza al volver la señal"}</div>
+          {bandExtra}
         </header>
+
+        <AlarmaVenc bolso={bolso} clave={`${tabKey}-${title}`} />
 
         {cargados === 0 && <p className="notice">Primera vez: recorré cada compartimento y cargá lo que tenés. Después sólo usás “Registrar uso” y “Reponer”.</p>}
 
