@@ -24,7 +24,8 @@ export type Cambio = {
   a: string | number | null;
 };
 export type TipoMov = "uso" | "repo" | "ajuste";
-export type Movimiento = { id: string; t: Date; tipo: TipoMov; nota: string; cambios: Cambio[] };
+/** `por` = display name of who did it (shared bags only). */
+export type Movimiento = { id: string; t: Date; tipo: TipoMov; nota: string; cambios: Cambio[]; por?: string };
 
 export type Level = "bad" | "warn" | "ok" | "none";
 export type Status = { level: Level; motivo: string };
@@ -225,10 +226,10 @@ export function removeItem(b: Bolso, id: string) {
 }
 
 /* ---------- Copy text for restocking ---------- */
-export function buildCopyText(b: Bolso, now = new Date()) {
+export function buildCopyText(b: Bolso, now = new Date(), titulo = "Bolso paramédico") {
   const all = rows(b, now);
   const bad = all.filter((x) => x.st.level === "bad"), warn = all.filter((x) => x.st.level === "warn");
-  let t = `Bolso paramédico – reposición al ${fmtDate(now)}\n`;
+  let t = `${titulo} – reposición al ${fmtDate(now)}\n`;
   for (const g of groupBySection(bad)) {
     t += `\n${g.s.nombre.toUpperCase()}\n`;
     for (const x of g.items) {
@@ -263,4 +264,34 @@ export function parseLegacyBackup(text: string): { bolso: Bolso; historial: Omit
     cambios: (h.cambios ?? []).map((c) => ({ id: c.id, nombre: c.nombre, tipo: c.tipo ?? "sn", campo: c.campo ?? "v", de: (c.de ?? null) as Cambio["de"], a: (c.a ?? null) as Cambio["a"] })),
   }));
   return { bolso, historial };
+}
+
+/* ---------- Summary of one bag (for the list of shared bags) ---------- */
+export type Resumen = { faltan: number; atencion: number; cargados: number; total: number; bad: Row[]; warn: Row[] };
+export function resumen(b: Bolso, now = new Date()): Resumen {
+  const all = rows(b, now);
+  const bad = all.filter((x) => x.st.level === "bad"), warn = all.filter((x) => x.st.level === "warn");
+  return { faltan: bad.length, atencion: warn.length, cargados: all.filter((x) => x.st.level !== "none").length, total: all.length, bad, warn };
+}
+
+/** One restocking text for several bags (management view). Bags never loaded are listed apart. */
+export function buildCopyTextVarios(bolsos: { nombre: string; ubicacion?: string; bolso: Bolso }[], now = new Date()) {
+  let t = `Bolsos – reposición al ${fmtDate(now)}\n`;
+  const sinCargar: string[] = [];
+  let algo = false;
+  for (const x of bolsos) {
+    const r = resumen(x.bolso, now);
+    if (!r.cargados) { sinCargar.push(x.nombre); continue; }
+    if (!r.faltan && !r.atencion) continue;
+    algo = true;
+    t += `\n*${x.nombre}*${x.ubicacion ? ` (${x.ubicacion})` : ""}\n`;
+    for (const y of r.bad) {
+      const extra = y.it.tipo === "cant" && y.it.min && y.st.motivo.startsWith("Faltan") ? ` – faltan ${Math.max(0, y.it.min - (x.bolso.cant[y.it.id] ?? 0))}` : y.st.motivo !== "Falta" ? ` (${y.st.motivo.toLowerCase()})` : "";
+      t += `• ${y.it.nombre}${extra}\n`;
+    }
+    for (const y of r.warn) t += `• ${y.it.nombre} (${y.st.motivo.toLowerCase()})\n`;
+  }
+  if (!algo) t += `\nNo falta nada en los bolsos revisados.\n`;
+  if (sinCargar.length) t += `\nTodavía sin inventariar: ${sinCargar.join(", ")}\n`;
+  return t.trim();
 }

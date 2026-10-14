@@ -152,3 +152,37 @@ body{margin:0}
 .gbtn svg{width:20px;height:20px}
 .err{color:var(--bad);font-size:14px}
 .splash{min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+
+/* ---------- Shared bags (/bolsos) ---------- */
+.backlink{border:0;background:none;color:var(--accent);font-weight:600;font-size:15px;padding:2px 0 8px;display:block}
+.titles{display:flex;flex-direction:column;gap:3px;min-width:0}
+.titles h1{overflow-wrap:anywhere}
+.subtitle{font-size:13px;color:var(--muted)}
+.tile.ok b{color:var(--ok)}
+.pill.none{background:var(--sunk);color:var(--muted)}
+.btn .cnt{font-family:var(--f-mono);font-size:12px;background:var(--bad);color:#fff;border-radius:999px;padding:1px 7px;margin-left:6px}
+.toolbar .btn{display:inline-flex;align-items:center}
+.notice-btn{display:block;width:100%;text-align:left;border:0;font-weight:600;cursor:pointer}
+.bags{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.bag{width:100%;display:flex;align-items:center;gap:10px;text-align:left;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--line);border-radius:12px;padding:12px 14px}
+.bag.bad{border-left-color:var(--bad)} .bag.warn{border-left-color:var(--warn)} .bag.ok{border-left-color:var(--ok)}
+.bag-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.bag-name{font-family:var(--f-display);font-weight:700;font-size:21px;text-transform:uppercase;letter-spacing:.03em;line-height:1.1;overflow-wrap:anywhere}
+.bag-where{font-size:14px;color:var(--muted)}
+.bag-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.bag-miss{font-size:13px;color:var(--bad)}
+.bag-when{font-size:13px;color:var(--muted)}
+.bag .chev{font-size:26px;color:var(--muted);line-height:1}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:10px}
+.form-grid label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:600}
+.form-grid input,.form-grid select{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:9px 10px;font-size:16px;font-weight:400;color:var(--ink)}
+.new-bag{margin-top:12px}
+.new-bag .acts,.bag-admin .acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.bag-admin{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.share-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.share-row input{flex:1 1 220px;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:9px 10px;font-size:16px}
+.share-row select,.row .opts select{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px;font-size:15px}
+.row .opts .btn{height:40px}
+.small-note{font-size:13px}
+.h-por{font-family:var(--f-body);color:var(--ink);font-weight:600}
+.login-card a,.empty-note a{color:var(--accent)}

@@ -1,16 +1,69 @@
 rules_version = '2';
 
-// Cada voluntario lee y escribe sólo su propio árbol: users/{uid}/...
+// Mi Bolso (personal) y Bolsos (de la institución).
+//
+// Personal — cada voluntario lee y escribe sólo su propio árbol:
 //   users/{uid}                    perfil (nombre, email, último acceso)
 //   users/{uid}/bolso/actual       inventario completo (catálogo + estados)
 //   users/{uid}/movimientos/{id}   historial: usos, reposiciones y ajustes
+//
+// Institución — bolsos compartidos, sólo para el equipo:
+//   equipo/{email}                 quién tiene acceso: rol "voluntario" | "gerencia"
+//   solicitudes/{email}            pedidos de acceso de quien entra por primera vez
+//   bolsos/{id}                    un bolso: nombre, ubicación + inventario
+//   bolsos/{id}/movimientos/{id}   su historial, firmado por quien lo hizo (por)
+//
+// Voluntario: ve todos los bolsos, carga usos / reposiciones / ajustes.
+// Gerencia: además crea, renombra y elimina bolsos, edita las listas y maneja el equipo.
+// Administradores (lista fija, igual que ADMINS en lib/bolsos.ts): siempre gerencia.
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function email() { return request.auth.token.email.lower(); }
+    function verified() { return signedIn() && request.auth.token.email != null && request.auth.token.email_verified == true; }
+    function admin() { return verified() && email() in ['urielchirazi@gmail.com']; }
+    function miembroDoc() { return /databases/$(database)/documents/equipo/$(email()); }
+    function miembro() { return admin() || (verified() && exists(miembroDoc())); }
+    function gerencia() { return admin() || (verified() && exists(miembroDoc()) && get(miembroDoc()).data.rol == 'gerencia'); }
+
+    /* ---------- Mi Bolso personal ---------- */
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
 
       match /{document=**} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    /* ---------- Equipo ---------- */
+    match /equipo/{e} {
+      allow read: if gerencia() || (verified() && e == email());
+      allow write: if gerencia()
+        && (request.resource == null || request.resource.data.rol in ['voluntario', 'gerencia']);
+    }
+
+    match /solicitudes/{e} {
+      allow read, delete: if gerencia() || (verified() && e == email());
+      allow create, update: if verified() && e == email() && request.resource.data.email == email();
+    }
+
+    /* ---------- Bolsos de la institución ---------- */
+    match /bolsos/{b} {
+      allow read: if miembro();
+      allow create, delete: if gerencia();
+      // gerencia cambia todo; un voluntario sólo el estado de los elementos
+      allow update: if gerencia()
+        || (miembro()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['valores', 'cant', 'venc', 'actualizado', 'actualizadoPor'])
+            && request.resource.data.actualizadoPor.uid == request.auth.uid);
+
+      match /movimientos/{m} {
+        allow read: if miembro();
+        allow create: if miembro() && request.resource.data.por.uid == request.auth.uid;
+        // cada uno puede seguir corrigiendo su propio "ajuste" (o borrarlo si quedó vacío)
+        allow update: if miembro() && resource.data.por.uid == request.auth.uid && request.resource.data.por.uid == request.auth.uid;
+        allow delete: if gerencia() || (miembro() && (resource == null || resource.data.por.uid == request.auth.uid));
       }
     }
   }

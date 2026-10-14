@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applySheet, emptyBolso, mergeCambio, parseLegacyBackup, rows, setCant, setValue, statusOf, findItem } from "../lib/inventory.ts";
+import { applySheet, buildCopyTextVarios, emptyBolso, mergeCambio, parseLegacyBackup, resumen, rows, setCant, setValue, statusOf, findItem } from "../lib/inventory.ts";
 
 const st = (b: ReturnType<typeof emptyBolso>, id: string) => { const f = findItem(b, id)!; return statusOf(b, f.it, f.c); };
 
@@ -54,4 +54,33 @@ test("imports a backup from the single-file app", () => {
   assert.equal(bolso.valores.ft7, undefined);
   assert.equal(historial.length, 1);
   assert.throws(() => parseLegacyBackup("{}"));
+});
+
+test("resumen counts missing, attention and loaded items of one bag", () => {
+  let b = emptyBolso();
+  assert.deepEqual([resumen(b).faltan, resumen(b).cargados], [0, 0]);
+  b = setCant(b, "ft7", 2)!.next;          // gasas below 4
+  b = setValue(b, "ft4", "SI")!.next;      // torniquete ok
+  const r = resumen(b);
+  assert.equal(r.faltan, 1);
+  assert.equal(r.cargados, 2);
+  assert.equal(r.total, 84);
+});
+
+test("restocking text for several bags lists each bag and the unloaded ones", () => {
+  let a = emptyBolso();
+  a = setCant(a, "ft7", 1)!.next;
+  a = setValue(a, "ft4", "NO")!.next;
+  let c = emptyBolso();
+  c = setValue(c, "ft4", "SI")!.next;
+  const t = buildCopyTextVarios([
+    { nombre: "Sede", ubicacion: "Recepción", bolso: a },
+    { nombre: "Auto 2", bolso: c },
+    { nombre: "Templo", bolso: emptyBolso() },
+  ], new Date(2026, 9, 14));
+  assert.match(t, /\*Sede\* \(Recepción\)/);
+  assert.match(t, /Gasas – faltan 3/);
+  assert.match(t, /• Torniquete\n/);
+  assert.doesNotMatch(t, /Auto 2/);
+  assert.match(t, /Todavía sin inventariar: Templo/);
 });

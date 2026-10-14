@@ -1,12 +1,11 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { User } from "firebase/auth";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   TIPOS, addItem, applySheet, buildCopyText, fmtWhen, groupBySection, mergeCambio, parseLegacyBackup,
   removeItem, renameItem, rows, setCant, setMin, setTipo, setValue, setVenc,
   type Bolso, type Cambio, type Draft, type Movimiento, type Tipo,
 } from "@/lib/inventory";
-import { importBackup, newMovimientoId, saveBolso, subscribeBolso, subscribeMovimientos } from "@/lib/data";
+import type { MovIn, Store } from "@/lib/data";
 import { Options, Stepper } from "./Controls";
 import Sheet from "./Sheet";
 import History from "./History";
@@ -14,8 +13,29 @@ import History from "./History";
 const AJUSTE_WINDOW = 5 * 60_000; // manual edits within 5 min are grouped in one history entry
 const PAGE = 50;
 
-export default function InventoryApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
-  const uid = user.uid;
+type Props = {
+  store: Store;
+  /** Big title in the status band. */
+  title: string;
+  /** Right side of the band (who is signed in, "Salir"). */
+  top: ReactNode;
+  /** Shown above the title, e.g. a link back to the list of bags. */
+  back?: { label: string; onClick: () => void };
+  subtitle?: string;
+  /** Whether "Editar lista" is offered (shared bags: management only). */
+  canEditList?: boolean;
+  /** Extra controls at the top of the list while editing (bag name, delete…). */
+  editExtra?: ReactNode;
+  copyTitle?: string;
+  savedText?: string;
+  loadingText?: string;
+  tabKey?: string;
+};
+
+export default function InventoryApp({
+  store, title, top, back, subtitle, canEditList = true, editExtra, copyTitle,
+  savedText = "Guardado en tu cuenta", loadingText = "Cargando tu bolso…", tabKey = "mibolso-tab",
+}: Props) {
   const [bolso, setBolso] = useState<Bolso | null>(null);
   const [movs, setMovs] = useState<Movimiento[]>([]);
   const [movLimit, setMovLimit] = useState(PAGE);
@@ -35,44 +55,49 @@ export default function InventoryApp({ user, onSignOut }: { user: User; onSignOu
     setToastMsg(m); clearTimeout(toastT.current); toastT.current = setTimeout(() => setToastMsg(""), 2400);
   }, []);
 
-  useEffect(() => subscribeBolso(uid, setBolso, (e) => setLoadError(e.message)), [uid]);
-  useEffect(() => subscribeMovimientos(uid, movLimit, setMovs, () => {}), [uid, movLimit]);
+  useEffect(() => { setBolso(null); setLoadError(""); return store.subscribe(setBolso, (e) => setLoadError(e.message)); }, [store]);
+  useEffect(() => store.subscribeMovs(movLimit, setMovs, () => {}), [store, movLimit]);
   useEffect(() => {
-    try { const t = localStorage.getItem("mibolso-tab"); if (t) setTab(t); } catch {}
+    try { const t = localStorage.getItem(tabKey); if (t) setTab(t); } catch {}
     const upd = () => setOnline(navigator.onLine); upd();
     window.addEventListener("online", upd); window.addEventListener("offline", upd);
     return () => { window.removeEventListener("online", upd); window.removeEventListener("offline", upd); };
-  }, []);
+  }, [tabKey]);
 
   // Writes go to Firestore's local cache first (the snapshot updates right away), then sync.
-  const persist = useCallback((next: Bolso, mov?: Parameters<typeof saveBolso>[2]) => {
+  const persist = useCallback((next: Bolso, mov?: MovIn, fields?: Cambio[]) => {
     setBolso(next);
-    saveBolso(uid, next, mov).catch(() => toast("No se pudo guardar. Revisá la conexión."));
-  }, [uid, toast]);
+    store.save(next, mov, fields).catch(() => toast("No se pudo guardar. Revisá la conexión."));
+  }, [store, toast]);
 
   const manual = useCallback((r: { next: Bolso; cambio: Cambio } | null) => {
     if (!r) return;
     const now = Date.now();
     let a = ajuste.current;
-    if (!a || now - a.at > AJUSTE_WINDOW) a = { id: newMovimientoId(uid), at: now, cambios: [] };
+    if (!a || now - a.at > AJUSTE_WINDOW) a = { id: store.newMovId(), at: now, cambios: [] };
     a = { ...a, at: now, cambios: mergeCambio(a.cambios, r.cambio) };
     ajuste.current = a;
-    persist(r.next, { id: a.id, tipo: "ajuste", cambios: a.cambios });
-  }, [uid, persist]);
+    persist(r.next, { id: a.id, tipo: "ajuste", cambios: a.cambios }, [r.cambio]);
+  }, [store, persist]);
 
   const all = useMemo(() => (bolso ? rows(bolso) : []), [bolso]);
 
-  if (loadError) return <div className="splash" style={{ padding: 16, textAlign: "center" }}>No se pudo cargar tu bolso ({loadError}). <button className="btn" onClick={onSignOut}>Salir</button></div>;
-  if (!bolso) return <div className="splash">Cargando tu bolso…</div>;
+  if (loadError) return (
+    <div className="splash" style={{ padding: 16, textAlign: "center", flexDirection: "column", gap: 12 }}>
+      <span>No se pudo cargar el bolso ({loadError}).</span>
+      {back ? <button className="btn" onClick={back.onClick}>{back.label}</button> : top}
+    </div>
+  );
+  if (!bolso) return <div className="splash">{loadingText}</div>;
 
   const bad = all.filter((x) => x.st.level === "bad"), warn = all.filter((x) => x.st.level === "warn");
   const cargados = all.filter((x) => x.st.level !== "none").length;
   const seccion = bolso.catalog.secciones.find((s) => s.id === tab);
 
-  function pickTab(t: string) { setTab(t); try { localStorage.setItem("mibolso-tab", t); } catch {} }
+  function pickTab(t: string) { setTab(t); try { localStorage.setItem(tabKey, t); } catch {} }
 
   async function copy() {
-    const txt = buildCopyText(bolso!);
+    const txt = buildCopyText(bolso!, new Date(), copyTitle);
     try { await navigator.clipboard.writeText(txt); setCopyFallback(""); toast("Lista copiada"); }
     catch { setCopyFallback(txt); toast("Seleccioná y copiá el texto"); }
   }
@@ -83,14 +108,15 @@ export default function InventoryApp({ user, onSignOut }: { user: User; onSignOu
     setSheet(null);
     if (!cambios.length) return toast("No hubo cambios");
     ajuste.current = null;
-    persist(next, { tipo: kind, nota, cambios });
+    persist(next, { tipo: kind, nota, cambios }, cambios);
     toast(kind === "uso" ? "Uso registrado" : "Reposición registrada");
   }
 
   async function doImport(text: string) {
+    if (!store.importBackup) return;
     try {
       const { bolso: b, historial } = parseLegacyBackup(text);
-      await importBackup(uid, b, historial);
+      await store.importBackup(b, historial);
       toast(`Importado: inventario y ${historial.length} movimientos`);
     } catch { toast("Esa copia no es válida"); }
   }
@@ -103,20 +129,17 @@ export default function InventoryApp({ user, onSignOut }: { user: User; onSignOu
     <>
       <div className="wrap">
         <header className="band">
+          {back && <button className="backlink" onClick={back.onClick}>‹ {back.label}</button>}
           <div className="band-top">
-            <h1>Mi Bolso</h1>
-            <span className="user">
-              {user.photoURL && <img src={user.photoURL} alt="" referrerPolicy="no-referrer" />}
-              <span>{user.displayName?.split(" ")[0] ?? user.email}</span>
-              <button onClick={onSignOut}>Salir</button>
-            </span>
+            <div className="titles"><h1>{title}</h1>{subtitle && <span className="subtitle">{subtitle}</span>}</div>
+            {top}
           </div>
           <div className="meter">
             <div className="tile bad"><b className="num">{bad.length}</b><span>Faltan</span></div>
             <div className="tile warn"><b className="num">{warn.length}</b><span>Atención</span></div>
             <div className="tile"><b className="num">{cargados}/{all.length}</b><span>Cargados</span></div>
           </div>
-          <div className="sync" style={{ marginTop: 6 }}>{online ? "Guardado en tu cuenta" : "Sin conexión: se guarda en el celular y se sincroniza al volver la señal"}</div>
+          <div className="sync" style={{ marginTop: 6 }}>{online ? savedText : "Sin conexión: se guarda en el celular y se sincroniza al volver la señal"}</div>
         </header>
 
         {cargados === 0 && <p className="notice">Primera vez: recorré cada compartimento y cargá lo que tenés. Después sólo usás “Registrar uso” y “Reponer”.</p>}
@@ -143,7 +166,7 @@ export default function InventoryApp({ user, onSignOut }: { user: User; onSignOu
         </nav>
 
         {tab === "historial" ? (
-          <History movs={movs} hasMore={movs.length >= movLimit} onMore={() => setMovLimit((n) => n + PAGE)} onImport={doImport} />
+          <History movs={movs} hasMore={movs.length >= movLimit} onMore={() => setMovLimit((n) => n + PAGE)} onImport={store.importBackup ? doImport : undefined} />
         ) : (
           <>
             <div className="toolbar">
@@ -152,9 +175,10 @@ export default function InventoryApp({ user, onSignOut }: { user: User; onSignOu
                   <button key={k} aria-pressed={filtro === k} onClick={() => setFiltro(k)}>{l}</button>
                 ))}
               </div>
-              <button className="btn" id="edit-toggle" onClick={() => { setEditing(!editing); setConfirmDel(null); if (!editing) setFiltro("todos"); }}>{editing ? "Listo" : "Editar lista"}</button>
+              {canEditList && <button className="btn" id="edit-toggle" onClick={() => { setEditing(!editing); setConfirmDel(null); if (!editing) setFiltro("todos"); }}>{editing ? "Listo" : "Editar lista"}</button>}
             </div>
             <main>
+              {editing && editExtra}
               {(seccion ?? bolso.catalog.secciones[0]).categorias.map((c) => {
                 let items = all.filter((x) => x.c.id === c.id);
                 const nb = items.filter((x) => x.st.level === "bad").length;

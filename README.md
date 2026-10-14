@@ -55,6 +55,16 @@ Mientras no haya cuenta de Vercel, la app se publica como sitio estático en Git
 Para pasar a Vercel más adelante: importar el repo en Vercel (rama `main`), agregar el dominio
 `*.vercel.app` en Firebase → Authentication → Dominios autorizados, y listo; el código es el mismo.
 
+## Bolsos de la institución (`/bolsos/`)
+
+https://mibolsohatzalah.github.io/mi-bolso/bolsos/ — la misma app, para los bolsos ubicados en lugares estratégicos. Mismo proyecto de Firebase y mismo login con Google.
+
+- **Equipo:** quien entra por primera vez queda como pedido de acceso (`solicitudes/{email}`) hasta que gerencia lo aprueba (`equipo/{email}`, rol `voluntario` o `gerencia`). Los administradores fijos están en `ADMINS` (lib/bolsos.ts) y en `firestore.rules`; tienen que coincidir.
+- **Voluntario:** ve todos los bolsos, registra usos, reposiciones y ajustes. Sólo puede cambiar el estado de los elementos (`valores`, `cant`, `venc`).
+- **Gerencia:** ve el estado de todos los bolsos, copia una lista de reposición combinada, crea / renombra / elimina bolsos, edita la lista de elementos de cada uno y maneja el equipo.
+- **Datos:** `bolsos/{id}` (nombre, ubicación + inventario) y `bolsos/{id}/movimientos/{id}` (historial firmado con `por`). Los cambios de estado se guardan campo por campo (`cant.ft7`, …) para que dos personas trabajando en el mismo bolso no se pisen.
+- Al cambiar `firestore.rules`, publicarlas en Firebase → Firestore → Reglas.
+
 ## Desarrollo local
 
 ```bash

@@ -78,3 +78,25 @@ export async function importBackup(uid: string, bolso: Bolso, historial: Omit<Mo
     await batch.commit();
   }
 }
+
+/* ---------- Store: what the inventory screen needs, for any bag ---------- */
+export type MovIn = { id?: string; tipo: TipoMov; nota?: string; cambios: Cambio[] };
+export type Store = {
+  subscribe: (next: (b: Bolso) => void, onError: (e: Error) => void) => Unsubscribe;
+  subscribeMovs: (max: number, next: (m: Movimiento[]) => void, onError: (e: Error) => void) => Unsubscribe;
+  newMovId: () => string;
+  /** `fields` = only these item values changed (lets several people edit one shared bag at once). */
+  save: (b: Bolso, mov?: MovIn, fields?: Cambio[]) => Promise<void>;
+  importBackup?: (b: Bolso, historial: Omit<Movimiento, "id">[]) => Promise<void>;
+};
+
+/** The volunteer's own bag (users/{uid}/...). */
+export function personalStore(uid: string): Store {
+  return {
+    subscribe: (next, onError) => subscribeBolso(uid, next, onError),
+    subscribeMovs: (max, next, onError) => subscribeMovimientos(uid, max, next, onError),
+    newMovId: () => newMovimientoId(uid),
+    save: (b, mov) => saveBolso(uid, b, mov),
+    importBackup: (b, h) => importBackup(uid, b, h),
+  };
+}
