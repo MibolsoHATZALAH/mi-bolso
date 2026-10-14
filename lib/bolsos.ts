@@ -6,11 +6,11 @@
 //   solicitudes/{email}            access requests from people who signed in but are not in the team yet
 import {
   doc, collection, onSnapshot, query, orderBy, limit as qLimit, serverTimestamp, writeBatch,
-  setDoc, updateDoc, deleteDoc, Timestamp, type Unsubscribe,
+  setDoc, updateDoc, deleteDoc, deleteField, Timestamp, type Unsubscribe,
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { fb } from "./firebase";
-import { emptyBolso, type Bolso, type Movimiento } from "./inventory";
+import { aplicarLista, copiarLista, emptyBolso, type Bolso, type CambioLista, type Movimiento } from "./inventory";
 import type { Store } from "./data";
 
 import { ADMINS } from "./config";
@@ -141,4 +141,46 @@ export function bolsoStore(id: string, user: User): Store {
       await batch.commit();
     },
   };
+}
+
+/* ---------- One list for every bag ---------- */
+/** Replays a list change made in one bag on all the others (management only). Item values the
+ *  change makes meaningless are removed field by field, so nobody's counts get overwritten. */
+export async function aplicarListaEnOtros(bolsos: BolsoInst[], exceptoId: string, ch: CambioLista) {
+  const batch = writeBatch(db());
+  let n = 0;
+  for (const x of bolsos) {
+    if (x.id === exceptoId) continue;
+    const next = aplicarLista(x.bolso, ch);
+    if (next === x.bolso) continue;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const upd: Record<string, any> = { catalog: next.catalog };
+    if (ch.op === "remove" || ch.op === "tipo") {
+      upd[`valores.${ch.id}`] = deleteField(); upd[`cant.${ch.id}`] = deleteField();
+      if (ch.op === "remove") upd[`venc.${ch.id}`] = deleteField();
+    }
+    batch.update(bolsoRef(x.id), upd);
+    n++;
+  }
+  if (n) await batch.commit();
+  return n;
+}
+
+/** Gives every other bag the same list as `origen`, keeping each bag's counts for the items they share. */
+export async function copiarListaATodos(bolsos: BolsoInst[], origen: BolsoInst) {
+  const batch = writeBatch(db());
+  let n = 0;
+  for (const x of bolsos) {
+    if (x.id === origen.id) continue;
+    const next = copiarLista(x.bolso, origen.bolso);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const upd: Record<string, any> = { catalog: next.catalog };
+    for (const campo of ["valores", "cant", "venc"] as const) {
+      for (const id of Object.keys(x.bolso[campo])) if (!(id in next[campo])) upd[`${campo}.${id}`] = deleteField();
+    }
+    batch.update(bolsoRef(x.id), upd);
+    n++;
+  }
+  if (n) await batch.commit();
+  return n;
 }

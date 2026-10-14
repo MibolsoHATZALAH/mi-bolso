@@ -63,6 +63,7 @@ https://mibolsohatzalah.github.io/mi-bolso/bolsos/ — la misma app, para los bo
 - **Voluntario:** ve todos los bolsos, registra usos, reposiciones y ajustes. Sólo puede cambiar el estado de los elementos (`valores`, `cant`, `venc`).
 - **Gerencia:** ve el estado de todos los bolsos, copia una lista de reposición combinada, crea / renombra / elimina bolsos, edita la lista de elementos de cada uno y maneja el equipo.
 - **Datos:** `bolsos/{id}` (nombre, ubicación + inventario) y `bolsos/{id}/movimientos/{id}` (historial firmado con `por`). Los cambios de estado se guardan campo por campo (`cant.ft7`, …) para que dos personas trabajando en el mismo bolso no se pisen.
+- **Una sola lista para todos:** cuando gerencia edita la lista de un bolso (agregar, quitar, renombrar, tipo o mínimo), el cambio se repite en todos los bolsos (`aplicarListaEnOtros`). "Copiar esta lista a todos los bolsos" iguala las listas de una vez. Las cantidades y vencimientos de cada bolso se mantienen.
 - Al cambiar `firestore.rules`, publicarlas en Firebase → Firestore → Reglas.
 
 ## Desarrollo local

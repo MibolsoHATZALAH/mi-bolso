@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   TIPOS, addItem, applySheet, buildCopyText, fmtWhen, groupBySection, mergeCambio, parseLegacyBackup,
-  removeItem, renameItem, rows, setCant, setMin, setTipo, setValue, setVenc,
-  type Bolso, type Cambio, type Draft, type Movimiento, type Tipo,
+  aplicarLista, rows, setCant, setValue, setVenc,
+  type Bolso, type Cambio, type CambioLista, type Draft, type Movimiento, type Tipo,
 } from "@/lib/inventory";
 import type { MovIn, Store } from "@/lib/data";
 import { Options, Stepper } from "./Controls";
@@ -31,13 +31,17 @@ type Props = {
   savedText?: string;
   loadingText?: string;
   tabKey?: string;
+  /** Called after each change to the list of items (shared bags replay it on the other bags). */
+  onListaChange?: (ch: CambioLista) => void;
+  /** Note shown while editing the list. */
+  editNote?: string;
   /** Extra row at the bottom of the status band (push alarms). */
   bandExtra?: ReactNode;
 };
 
 export default function InventoryApp({
   store, title, top, back, subtitle, canEditList = true, editExtra, copyTitle,
-  savedText = "Guardado en tu cuenta", loadingText = "Cargando tu bolso…", tabKey = "mibolso-tab", bandExtra,
+  savedText = "Guardado en tu cuenta", loadingText = "Cargando tu bolso…", tabKey = "mibolso-tab", bandExtra, onListaChange, editNote,
 }: Props) {
   const [bolso, setBolso] = useState<Bolso | null>(null);
   const [movs, setMovs] = useState<Movimiento[]>([]);
@@ -82,6 +86,13 @@ export default function InventoryApp({
     ajuste.current = a;
     persist(r.next, { id: a.id, tipo: "ajuste", cambios: a.cambios }, [r.cambio]);
   }, [store, persist]);
+
+  const editLista = useCallback((b: Bolso, ch: CambioLista) => {
+    const next = aplicarLista(b, ch);
+    if (next === b) return;
+    persist(next);
+    onListaChange?.(ch);
+  }, [persist, onListaChange]);
 
   const all = useMemo(() => (bolso ? rows(bolso) : []), [bolso]);
 
@@ -184,6 +195,7 @@ export default function InventoryApp({
               {canEditList && <button className="btn" id="edit-toggle" onClick={() => { setEditing(!editing); setConfirmDel(null); if (!editing) setFiltro("todos"); }}>{editing ? "Listo" : "Editar lista"}</button>}
             </div>
             <main>
+              {editing && editNote && <p className="notice">{editNote}</p>}
               {editing && editExtra}
               {(seccion ?? bolso.catalog.secciones[0]).categorias.map((c) => {
                 let items = all.filter((x) => x.c.id === c.id);
@@ -199,13 +211,13 @@ export default function InventoryApp({
                     <ul className="rows">
                       {items.map(({ it, st }) => editing ? (
                         <li className="row" key={it.id}><div className="edit-row">
-                          <input type="text" defaultValue={it.nombre} aria-label="Nombre" onBlur={(e) => { if (e.target.value.trim() && e.target.value.trim() !== it.nombre) persist(renameItem(bolso, it.id, e.target.value)); }} />
-                          <select value={it.tipo} aria-label="Tipo" onChange={(e) => persist(setTipo(bolso, it.id, e.target.value as Tipo))}>
+                          <input type="text" defaultValue={it.nombre} aria-label="Nombre" onBlur={(e) => { if (e.target.value.trim() && e.target.value.trim() !== it.nombre) editLista(bolso, { op: "rename", id: it.id, nombre: e.target.value.trim() }); }} />
+                          <select value={it.tipo} aria-label="Tipo" onChange={(e) => editLista(bolso, { op: "tipo", id: it.id, tipo: e.target.value as Tipo })}>
                             {Object.entries(TIPOS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
                           </select>
-                          {it.tipo === "cant" && <label>Mínimo <input type="number" min={0} defaultValue={it.min ?? ""} onBlur={(e) => persist(setMin(bolso, it.id, e.target.value === "" ? null : Number(e.target.value)))} /></label>}
+                          {it.tipo === "cant" && <label>Mínimo <input type="number" min={0} defaultValue={it.min ?? ""} onBlur={(e) => { const min = e.target.value === "" ? null : Number(e.target.value); if ((min || undefined) !== it.min) editLista(bolso, { op: "min", id: it.id, min }); }} /></label>}
                           {confirmDel === it.id
-                            ? <><button className="btn danger" onClick={() => { persist(removeItem(bolso, it.id)); setConfirmDel(null); }}>Confirmar</button><button className="btn" onClick={() => setConfirmDel(null)}>No</button></>
+                            ? <><button className="btn danger" onClick={() => { editLista(bolso, { op: "remove", id: it.id }); setConfirmDel(null); }}>Confirmar</button><button className="btn" onClick={() => setConfirmDel(null)}>No</button></>
                             : <button className="btn danger" onClick={() => setConfirmDel(it.id)}>Quitar</button>}
                         </div></li>
                       ) : (
@@ -230,7 +242,7 @@ export default function InventoryApp({
                     {editing && (
                       <form className="add-row" onSubmit={(e) => {
                         e.preventDefault(); const input = e.currentTarget.elements.namedItem("nuevo") as HTMLInputElement;
-                        if (input.value.trim()) { persist(addItem(bolso, c.id, input.value, `${c.id}-${Date.now().toString(36)}`)); input.value = ""; }
+                        if (input.value.trim()) { editLista(bolso, { op: "add", catId: c.id, id: `${c.id}-${Date.now().toString(36)}`, nombre: input.value.trim() }); input.value = ""; }
                       }}>
                         <input name="nuevo" placeholder={`Agregar elemento a ${c.nombre}`} aria-label="Nuevo elemento" />
                         <button className="btn primary">Agregar</button>

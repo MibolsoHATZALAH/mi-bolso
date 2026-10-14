@@ -315,3 +315,42 @@ export function alertasVenc(b: Bolso, now = new Date()): AlertaVenc[] {
 }
 export const textoVenc = (a: { dias: number }) =>
   a.dias < 0 ? (a.dias === -1 ? "venció ayer" : `vencido hace ${-a.dias} días`) : a.dias === 0 ? "vence hoy" : a.dias === 1 ? "vence mañana" : `vence en ${a.dias} días`;
+
+/* ---------- List changes that can be replayed on other bags ---------- */
+export type CambioLista =
+  | { op: "rename"; id: string; nombre: string }
+  | { op: "tipo"; id: string; tipo: Tipo }
+  | { op: "min"; id: string; min: number | null }
+  | { op: "add"; catId: string; id: string; nombre: string }
+  | { op: "remove"; id: string };
+
+/** Applies one list change to a bag. Items/categories the bag doesn't have are left alone. */
+export function aplicarLista(b: Bolso, ch: CambioLista): Bolso {
+  switch (ch.op) {
+    case "rename": return findItem(b, ch.id) ? renameItem(b, ch.id, ch.nombre) : b;
+    case "tipo": { const f = findItem(b, ch.id); return f && f.it.tipo !== ch.tipo ? setTipo(b, ch.id, ch.tipo) : b; }
+    case "min": return findItem(b, ch.id) ? setMin(b, ch.id, ch.min) : b;
+    case "remove": return findItem(b, ch.id) ? removeItem(b, ch.id) : b;
+    case "add": {
+      if (findItem(b, ch.id)) return b;
+      const tiene = b.catalog.secciones.some((s) => s.categorias.some((c) => c.id === ch.catId));
+      return tiene ? addItem(b, ch.catId, ch.nombre, ch.id) : b;
+    }
+  }
+}
+
+/** Gives bag `b` the list of `origen`, keeping b's values for the items both have. */
+export function copiarLista(b: Bolso, origen: Bolso): Bolso {
+  const catalog: Catalog = JSON.parse(JSON.stringify(origen.catalog));
+  const ids = new Set<string>();
+  for (const s of catalog.secciones) for (const c of s.categorias) for (const it of c.items) ids.add(it.id);
+  const tipoDe = new Map<string, Tipo>();
+  for (const s of catalog.secciones) for (const c of s.categorias) for (const it of c.items) tipoDe.set(it.id, it.tipo);
+  const prevTipo = new Map<string, Tipo>();
+  for (const s of b.catalog.secciones) for (const c of s.categorias) for (const it of c.items) prevTipo.set(it.id, it.tipo);
+  // values only survive when the item still exists with the same kind of control
+  const keep = (id: string) => ids.has(id) && prevTipo.get(id) === tipoDe.get(id);
+  const pick = <T,>(m: Record<string, T>) => Object.fromEntries(Object.entries(m).filter(([id]) => keep(id)));
+  const vencOk = (id: string) => ids.has(id);
+  return { schema: b.schema, catalog, valores: pick(b.valores), cant: pick(b.cant), venc: Object.fromEntries(Object.entries(b.venc).filter(([id]) => vencOk(id))) };
+}

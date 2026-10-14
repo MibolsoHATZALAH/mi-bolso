@@ -84,3 +84,34 @@ test("restocking text for several bags lists each bag and the unloaded ones", ()
   assert.doesNotMatch(t, /Auto 2/);
   assert.match(t, /Todavía sin inventariar: Templo/);
 });
+
+test("list changes replay on another bag without touching its counts", async () => {
+  const { aplicarLista, copiarLista } = await import("../lib/inventory.ts");
+  let otro = setCant(emptyBolso(), "ft7", 9)!.next;           // gasas: 9 in the other bag
+  otro = setValue(otro, "ft4", "SI")!.next;
+  otro = aplicarLista(otro, { op: "rename", id: "ft7", nombre: "Gasas estériles" });
+  otro = aplicarLista(otro, { op: "min", id: "ft7", min: 10 });
+  otro = aplicarLista(otro, { op: "add", catId: "ft", id: "ft-x1", nombre: "Venda israelí" });
+  assert.equal(findItem(otro, "ft7")!.it.nombre, "Gasas estériles");
+  assert.equal(findItem(otro, "ft7")!.it.min, 10);
+  assert.equal(otro.cant.ft7, 9);
+  assert.equal(findItem(otro, "ft-x1")!.it.nombre, "Venda israelí");
+  otro = aplicarLista(otro, { op: "remove", id: "ft4" });
+  assert.equal(findItem(otro, "ft4"), null);
+  assert.equal(otro.valores.ft4, undefined);
+  // unknown item / category: nothing happens (same object)
+  const same = aplicarLista(otro, { op: "rename", id: "nope", nombre: "x" });
+  assert.equal(same, otro);
+  assert.equal(aplicarLista(otro, { op: "add", catId: "nocat", id: "z", nombre: "z" }), otro);
+
+  // copy a whole list: shared items keep their counts, missing ones go away
+  let origen = aplicarLista(emptyBolso(), { op: "remove", id: "ft7" });
+  origen = aplicarLista(origen, { op: "add", catId: "fh", id: "fh-n", nombre: "Linterna" });
+  let b = setCant(emptyBolso(), "ft7", 3)!.next;
+  b = setCant(b, "ft5", 2)!.next;
+  const c = copiarLista(b, origen);
+  assert.equal(findItem(c, "ft7"), null);
+  assert.equal(c.cant.ft7, undefined);
+  assert.equal(c.cant.ft5, 2);
+  assert.ok(findItem(c, "fh-n"));
+});

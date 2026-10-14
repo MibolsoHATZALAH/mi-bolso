@@ -2,9 +2,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut, type User } from "firebase/auth";
 import { fb } from "@/lib/firebase";
-import { alertasVenc, buildCopyTextVarios, resumen, type Bolso } from "@/lib/inventory";
+import { alertasVenc, buildCopyTextVarios, resumen, type Bolso, type CambioLista } from "@/lib/inventory";
 import {
-  ADMINS, agregarMiembro, aprobar, bolsoStore, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
+  ADMINS, agregarMiembro, aplicarListaEnOtros, aprobar, bolsoStore, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
   quitarMiembro, rechazar, subscribeAcceso, subscribeBolsos, subscribeEquipo, subscribeSolicitudes,
   type Acceso, type BolsoInst, type Miembro, type Rol, type Solicitud,
 } from "@/lib/bolsos";
@@ -94,7 +94,12 @@ function BolsosApp({ user, rol }: { user: User; rol: Rol }) {
         <span>Ese bolso ya no existe.</span><button className="btn" onClick={() => ir({ k: "lista" })}>Ver todos los bolsos</button>
       </div>
     );
-    return <BolsoView key={b.id} b={b} user={user} gerencia={gerencia} chip={chip} onBack={() => ir({ k: "lista" })} toast={toast} />;
+    return (
+      <>
+        <BolsoView key={b.id} b={b} bolsos={bolsos} user={user} gerencia={gerencia} chip={chip} onBack={() => ir({ k: "lista" })} toast={toast} />
+        <div className={`toast ${toastMsg ? "show" : ""}`} role="status">{toastMsg}</div>
+      </>
+    );
   }
 
   return (
@@ -109,13 +114,23 @@ function BolsosApp({ user, rol }: { user: User; rol: Rol }) {
 }
 
 /* ---------- One bag: the same screen as Mi Bolso ---------- */
-function BolsoView({ b, user, gerencia, chip, onBack, toast }: {
-  b: BolsoInst; user: User; gerencia: boolean; chip: React.ReactNode; onBack: () => void; toast: (m: string) => void;
+function BolsoView({ b, bolsos, user, gerencia, chip, onBack, toast }: {
+  b: BolsoInst; bolsos: BolsoInst[]; user: User; gerencia: boolean; chip: React.ReactNode; onBack: () => void; toast: (m: string) => void;
 }) {
   const store = useMemo(() => bolsoStore(b.id, user), [b.id, user]);
   const [nombre, setNombre] = useState(b.nombre);
   const [ubic, setUbic] = useState(b.ubicacion);
   const [borrar, setBorrar] = useState(false);
+  const [igualar, setIgualar] = useState(false);
+  const otros = bolsos.length - 1;
+  // the other bags as they are right now, for replaying list changes
+  const bolsosRef = useRef(bolsos);
+  bolsosRef.current = bolsos;
+  const onListaChange = useCallback((ch: CambioLista) => {
+    aplicarListaEnOtros(bolsosRef.current, b.id, ch)
+      .then((n) => { if (n) toast(`Lista actualizada en ${n === 1 ? "1 bolso más" : `${n} bolsos más`}`); })
+      .catch(() => toast("No se pudo actualizar la lista en los otros bolsos"));
+  }, [b.id, toast]);
   useEffect(() => { setNombre(b.nombre); setUbic(b.ubicacion); }, [b.nombre, b.ubicacion]);
 
   const guardarDatos = () => {
@@ -140,6 +155,18 @@ function BolsoView({ b, user, gerencia, chip, onBack, toast }: {
           </div>
         </div>
       ) : <div className="acts"><button className="btn danger" onClick={() => setBorrar(true)}>Eliminar este bolso</button></div>}
+      {otros > 0 && (igualar ? (
+        <div className="confirm">
+          <span>Los otros {otros} bolsos van a quedar con la misma lista que <b>{b.nombre}</b>. Se mantiene lo cargado en los elementos que ya tienen; lo que no esté en esta lista se borra.</span>
+          <div className="acts">
+            <button className="btn primary" onClick={() => {
+              setIgualar(false);
+              copiarListaATodos(bolsosRef.current, b).then((n) => toast(`Lista copiada a ${n === 1 ? "1 bolso" : `${n} bolsos`}`)).catch(() => toast("No se pudo copiar la lista"));
+            }}>Sí, copiar a todos</button>
+            <button className="btn" onClick={() => setIgualar(false)}>Cancelar</button>
+          </div>
+        </div>
+      ) : <div className="acts"><button className="btn" onClick={() => setIgualar(true)}>Copiar esta lista a todos los bolsos</button></div>)}
     </section>
   ) : null;
 
@@ -148,6 +175,8 @@ function BolsoView({ b, user, gerencia, chip, onBack, toast }: {
       store={store} title={b.nombre} subtitle={b.ubicacion} top={chip}
       back={{ label: "Todos los bolsos", onClick: onBack }}
       canEditList={gerencia} editExtra={editExtra} copyTitle={b.nombre}
+      onListaChange={gerencia && otros > 0 ? onListaChange : undefined}
+      editNote={otros > 0 ? `Los cambios en la lista (agregar, quitar, renombrar, tipo o mínimo) se aplican también en los otros ${otros === 1 ? "bolso" : `${otros} bolsos`}. Las cantidades y vencimientos de cada bolso no cambian.` : undefined}
       savedText={b.actualizado ? `Revisado ${hace(b.actualizado)}${b.por ? ` por ${b.por}` : ""} · lo ve todo el equipo` : "Lo que cargues lo ve todo el equipo"}
       loadingText="Cargando el bolso…" tabKey="bolsos-tab" bandExtra={<AlarmasPush user={user} app="bolsos" />}
     />
