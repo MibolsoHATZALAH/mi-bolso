@@ -43,6 +43,18 @@ Cada cambio guarda el inventario y su movimiento en un mismo batch. Los cambios 
 ### 3. Dominio autorizado
 Firebase → Authentication → **Configuración → Dominios autorizados** → agregar el dominio de Vercel (por ejemplo `mi-bolso.vercel.app`). Sin esto, el login con Google falla.
 
+## Publicación actual: GitHub Pages
+
+Mientras no haya cuenta de Vercel, la app se publica como sitio estático en GitHub Pages
+(`https://mibolsohatzalah.github.io/mi-bolso/`, rama `gh-pages`):
+
+```bash
+./deploy-pages.sh   # STATIC_EXPORT=1 next build → out/ → push a gh-pages (la app anterior queda en /anterior/)
+```
+
+Para pasar a Vercel más adelante: importar el repo en Vercel (rama `main`), agregar el dominio
+`*.vercel.app` en Firebase → Authentication → Dominios autorizados, y listo; el código es el mismo.
+
 ## Desarrollo local
 
 ```bash

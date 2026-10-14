@@ -38,7 +38,7 @@ export default function History({ movs, hasMore, onMore, onImport }: {
 
       <section className="backup">
         <h3>Importar de la app anterior</h3>
-        <p>Si ya venías usando Mi Bolso en el link anterior, abrí ahí Historial → “Copiar como texto” (o “Descargar copia”) y traelo acá. Reemplaza el inventario actual y suma su historial.</p>
+        <p>Si ya venías usando Mi Bolso antes, abrí la <a href={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/anterior/`}>versión anterior</a> en este mismo celular, andá a Historial → “Copiar como texto” y pegalo acá abajo. Reemplaza el inventario actual y suma su historial.</p>
         <div className="acts">
           <label className="btn" htmlFor="bk-file" style={{ display: "inline-flex", alignItems: "center" }}>Elegir archivo de copia</label>
           <input type="file" id="bk-file" accept=".json,application/json,text/plain" hidden
