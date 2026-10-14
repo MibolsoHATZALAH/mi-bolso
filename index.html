@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0E5568">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mi Bolso">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Mi Bolso Paramédico</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: sticky status band → missing summary → compartment tabs → live inventory rows; fixed bottom bar opens "uso" / "reponer" sheets */
+:root{
+  --bg:#EEF2F1; --surface:#FFFFFF; --sunk:#E3E9E7; --ink:#14211D; --muted:#5B6A65; --line:#D2DBD8;
+  --accent:#0E5568; --accent-ink:#FFFFFF; --sel:#DCEEF2;
+  --ok:#1E7A46; --ok-bg:#DDF1E4; --bad:#C2321E; --bad-bg:#FBE3DE; --warn:#A86400; --warn-bg:#FCEFD6;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1614; --surface:#18221F; --sunk:#111A17; --ink:#E6EEEB; --muted:#93A39E; --line:#2A3833;
+  --accent:#5FB7CC; --accent-ink:#06191F; --sel:#16333B;
+  --ok:#5BCB8A; --ok-bg:#163526; --bad:#FF7A64; --bad-bg:#3D1C17; --warn:#F2B04C; --warn-bg:#3A2A10; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1614; --surface:#18221F; --sunk:#111A17; --ink:#E6EEEB; --muted:#93A39E; --line:#2A3833;
+  --accent:#5FB7CC; --accent-ink:#06191F; --sel:#16333B;
+  --ok:#5BCB8A; --ok-bg:#163526; --bad:#FF7A64; --bad-bg:#3D1C17; --warn:#F2B04C; --warn-bg:#3A2A10; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.4}
+.wrap{max-width:820px;margin:0 auto;padding-inline:16px;padding-block:0 120px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+.band{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);margin-inline:-16px;padding:12px 16px 10px}
+.band-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--f-display);font-weight:800;font-size:28px;letter-spacing:.02em;text-transform:uppercase;margin:0;line-height:1}
+.sync{font-size:13px;color:var(--muted)}
+.meter{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile b{font-family:var(--f-mono);font-size:22px;line-height:1.1}
+.tile span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.tile.bad b{color:var(--bad)} .tile.warn b{color:var(--warn)}
+
+.summary{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--bad);border-radius:12px;padding:14px 16px}
+.summary.clear{border-left-color:var(--ok)}
+.summary h2{font-family:var(--f-display);font-size:22px;text-transform:uppercase;letter-spacing:.03em;margin:0}
+.sum-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.sum-group{margin-top:12px}
+.sum-group h3{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 4px;font-weight:600}
+.sum-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.sum-list li{display:flex;gap:8px;align-items:baseline;justify-content:space-between;border-bottom:1px dashed var(--line);padding:4px 0}
+.sum-list li:last-child{border-bottom:0}
+.sum-list .where{font-size:13px;color:var(--muted)}
+.pill{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;letter-spacing:.03em}
+.pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.info{background:var(--sel);color:var(--accent)}
+.empty-note{color:var(--muted);margin:8px 0 0}
+
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px;font-weight:600;font-size:14px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:default}
+
+.tabs{display:flex;gap:6px;margin-top:20px;overflow-x:auto;padding-bottom:2px}
+.tab{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font-family:var(--f-display);font-weight:700;font-size:17px;letter-spacing:.03em;text-transform:uppercase;display:flex;gap:8px;align-items:center}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tab .cnt{font-family:var(--f-mono);font-size:12px;background:var(--bad);color:#fff;border-radius:999px;padding:1px 7px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.seg-filter{display:flex;background:var(--sunk);border-radius:8px;padding:3px;gap:2px}
+.seg-filter button{border:0;background:transparent;padding:6px 10px;border-radius:6px;font-size:14px;font-weight:600;color:var(--muted)}
+.seg-filter button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+
+.cat{margin-top:18px}
+.cat-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-bottom:2px solid var(--ink);padding-bottom:4px}
+.cat-head h3{font-family:var(--f-display);font-size:19px;text-transform:uppercase;letter-spacing:.04em;margin:0}
+.cat-head .num{font-size:13px;color:var(--muted)}
+.rows{list-style:none;margin:0;padding:0}
+.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.row .name{flex:1 1 170px;min-width:0;display:flex;flex-direction:column;gap:3px}
+.row .sub{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.row .sub input[type=date]{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:2px 6px;font-size:13px}
+.row.is-bad .name>span:first-child{color:var(--bad);font-weight:600}
+.row.picked{background:var(--sel);margin-inline:-8px;padding-inline:8px;border-radius:8px}
+.opts{display:flex;gap:4px;flex:0 0 auto;flex-wrap:wrap}
+.opt{min-width:52px;height:40px;border:1.5px solid var(--line);background:var(--surface);border-radius:8px;font-weight:700;font-size:14px;letter-spacing:.04em;color:var(--muted)}
+.opt.on.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.opt.on.bad{background:var(--bad);border-color:var(--bad);color:#fff}
+.opt.on.warn{background:var(--warn);border-color:var(--warn);color:#fff}
+.opt.on.info{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.step{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);overflow:hidden;flex:0 0 auto}
+.step button{width:42px;height:40px;border:0;background:transparent;font-size:20px;font-weight:700}
+.step input{width:52px;height:40px;border:0;border-inline:1px solid var(--line);text-align:center;background:transparent;font-family:var(--f-mono);font-size:16px;-moz-appearance:textfield}
+.step input::-webkit-outer-spin-button,.step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.step.bad{border-color:var(--bad)} .step.bad input{color:var(--bad);font-weight:700}
+.of{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+
+.edit-row{display:flex;gap:6px;flex:1 1 100%;flex-wrap:wrap;align-items:center}
+.edit-row input[type=text]{flex:1 1 180px;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:6px 8px}
+.edit-row select{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:6px}
+.edit-row label{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:4px}
+.edit-row input[type=number]{width:64px;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:6px}
+.add-row{display:flex;gap:6px;margin-top:8px}
+.add-row input{flex:1;min-width:0;border:1px dashed var(--line);background:var(--surface);border-radius:6px;padding:8px}
+.none{color:var(--muted);padding:10px 0;margin:0}
+
+.hist{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.hist li{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.hist .h-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.hist .h-note{margin-top:4px;font-style:italic}
+.hist .h-items{font-size:14px;color:var(--muted);margin-top:4px;display:flex;flex-direction:column;gap:2px}
+.hist .h-items .num{font-size:13px}
+.backup{margin-top:28px;border-top:1px solid var(--line);padding-top:16px;display:flex;flex-direction:column;gap:8px}
+.backup h3{font-family:var(--f-display);font-size:19px;text-transform:uppercase;margin:0}
+.backup p{margin:0;color:var(--muted);font-size:14px;max-width:60ch}
+.backup .acts{display:flex;gap:8px;flex-wrap:wrap}
+
+.notice{margin-top:12px;font-size:14px;background:var(--warn-bg);color:var(--warn);padding:8px 12px;border-radius:8px}
+.confirm{margin-top:12px;background:var(--surface);border:1px solid var(--bad);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.confirm .acts{display:flex;gap:8px;flex-wrap:wrap}
+textarea.copy-fallback{width:100%;min-height:140px;margin-top:8px;font-family:var(--f-mono);font-size:12px;background:var(--sunk);color:var(--ink);border:1px solid var(--line);border-radius:6px}
+
+.actionbar{position:fixed;left:0;right:0;bottom:0;z-index:8;background:var(--surface);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;justify-content:center}
+.actionbar .btn{flex:1;max-width:390px;height:50px;font-size:16px;font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+.actionbar .use{background:var(--bad);border-color:var(--bad);color:#fff}
+.actionbar .repo{background:var(--ok);border-color:var(--ok);color:#fff}
+
+.sheet{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;flex-direction:column}
+.sheet[hidden]{display:none}
+.sheet-head{padding:calc(12px + env(safe-area-inset-top,0px)) 16px 10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px;background:var(--surface)}
+.sheet-head .t{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sheet-head h2{font-family:var(--f-display);font-size:24px;text-transform:uppercase;margin:0}
+.sheet-head p{margin:0;font-size:14px;color:var(--muted)}
+.sheet-head input[type=search]{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;width:100%}
+.sheet-body{flex:1;overflow-y:auto;padding:0 16px 24px}
+.sheet-body .inner{max-width:820px;margin:0 auto}
+.sheet-foot{border-top:1px solid var(--line);background:var(--surface);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px}
+.sheet-foot .inner{max-width:820px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:8px}
+.sheet-foot input{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:10px;width:100%}
+.sheet-foot .acts{display:flex;gap:8px}
+.sheet-foot .acts .btn{flex:1;height:48px;font-size:16px}
+.toggle{min-width:96px;height:40px;border:1.5px solid var(--line);background:var(--surface);border-radius:8px;font-weight:700;font-size:14px;color:var(--muted)}
+.toggle.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:30}
+.toast.show{opacity:1}
+@media (max-width:480px){ h1{font-size:24px} .tile b{font-size:19px} .opt{min-width:46px} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="band">
+    <div class="band-top">
+      <h1>Mi Bolso</h1>
+      <span class="sync" id="sync"></span>
+    </div>
+    <div class="meter">
+      <div class="tile bad"><b class="num" id="m-falta">0</b><span>Faltan</span></div>
+      <div class="tile warn"><b class="num" id="m-aten">0</b><span>Atención</span></div>
+      <div class="tile"><b class="num" id="m-rev">0/0</b><span>Cargados</span></div>
+    </div>
+  </header>
+  <div id="notice"></div>
+  <section class="summary" id="summary" aria-live="polite"></section>
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+  <div class="toolbar" id="toolbar"></div>
+  <main id="main"></main>
+</div>
+
+<div class="actionbar">
+  <button class="btn use" id="open-uso">Registrar uso</button>
+  <button class="btn repo" id="open-repo">Reponer</button>
+</div>
+
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+  <div class="sheet-head"><div class="t"><h2 id="sheet-title"></h2><button class="btn" id="sheet-close">Cancelar</button></div><p id="sheet-help"></p><input type="search" id="sheet-q" placeholder="Buscar elemento…" aria-label="Buscar elemento"></div>
+  <div class="sheet-body"><div class="inner" id="sheet-list"></div></div>
+  <div class="sheet-foot"><div class="inner"><input id="sheet-note" placeholder="Nota (opcional): tipo de atención, lugar…" aria-label="Nota"><div class="acts"><button class="btn primary" id="sheet-save"></button></div></div></div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ---------- Default inventory ---------- */
+const DEFAULT_CATALOG = {secciones:[
+ {id:"frontal",nombre:"Bolso frontal",categorias:[
+  {id:"fh",nombre:"Herramientas",items:[["fh1","Tijera de trauma"],["fh2","Jeringa 10 ml"],["fh3","Jeringa tuberculina"],["fh4","Planilla de atención / registro"],["fh5","Pinza de depilar"],["fh6","Bajalenguas adulto"],["fh7","Férula digital de aluminio"]]},
+  {id:"ft",nombre:"Trauma",items:[["ft1","Venda cambric ancha"],["ft2","Venda cambric angosta"],["ft3","Cinta"],["ft4","Torniquete"],["ft5","Curitas adulto"],["ft6","Curitas pediátricas"],["ft7","Gasas"],["ft8","Steri-Strip chico"],["ft9","Steri-Strip grande"],["ft10","Manta térmica"],["ft11","Cabestrillo"],["ft12","Apósitos"],["ft13","Venda elástica"]]},
+  {id:"fm",nombre:"Medicamentos y desinfección",vence:true,items:[["fm1","Aspirineta (AAS)"],["fm2","Carbón activado"],["fm3","Glucogel"],["fm4","Epinefrina"],["fm5","Clorhexidina"],["fm6","Solución fisiológica"],["fm7","Burn Free"],["fm8","Alcohol 70%"]]}]},
+ {id:"principal",nombre:"Bolsillo principal",categorias:[
+  {id:"ph",nombre:"Herramientas",items:[["ph1","Kit de parto"],["ph2","Pañales adulto"],["ph3","Bolsas para desechos"],["ph4","Camisolín descartable"],["ph5","DEA"]]},
+  {id:"pb",nombre:"Bioseguridad",items:[["pb1","Cofia"],["pb2","Protección de pies (botas)"],["pb3","Kit EPP"],["pb4","Férula SAM"]]},
+  {id:"pi",nombre:"Inmovilización",items:[["pi1","Férula SAM"],["pi2","Collarín adulto"],["pi3","Collarín pediátrico"]]},
+  {id:"po",nombre:"Oxígeno",items:[["po1","Carga de O₂","nivel"],["po2","Regulador"],["po3","Cánula nasal adulto"],["po4","Cánula nasal pediátrica"],["po5","Cánula nasal neonatal"],["po6","Máscara facial común adulto"],["po7","Máscara facial común pediátrica"],["po8","Máscara facial común neonatal"],["po9","Máscara no recirculante adulto"],["po10","Máscara no recirculante pediátrica"],["po11","Máscara no recirculante neonatal"]]},
+  {id:"pv",nombre:"Vía aérea",items:[["pv1","Sonda de aspiración adulto"],["pv2","Sonda de aspiración pediátrica"],["pv3","BVM adulto"],["pv4","BVM pediátrico"],["pv5","BVM pocket"],["pv6","Cánula orofaríngea N° 000"],["pv7","Cánula orofaríngea N° 00 (rosa)"],["pv8","Cánula orofaríngea N° 0 (azul)"],["pv9","Cánula orofaríngea N° 1 (negra)"],["pv10","Cánula orofaríngea N° 2 (blanca)"],["pv11","Cánula orofaríngea N° 3 (verde)"],["pv12","Cánula orofaríngea N° 4 (amarilla)"],["pv13","Cánula orofaríngea N° 5 (roja)"],["pv14","Cánula orofaríngea N° 6 (naranja)"],["pv15","Cánulas nasofaríngeas adulto"],["pv16","Cánulas nasofaríngeas pediátricas"]]}]},
+ {id:"laterales",nombre:"Bolsillos laterales",categorias:[
+  {id:"ld",nombre:"Derecho · Signos vitales",items:[["ld1","Tensiómetro adulto"],["ld2","Tensiómetro pediátrico"],["ld3","Estetoscopio"]]},
+  {id:"ls",nombre:"Izquierdo · Signos vitales",items:[["ls1","Glucómetro"],["ls2","Tiras reactivas"],["ls3","Lancetas"],["ls4","Linterna LED"],["ls5","Pulsioxímetro"],["ls6","Termómetro"],["ls7","Acetona"],["ls8","Paños"],["ls9","Algodón"]]},
+  {id:"lb",nombre:"Izquierdo · Bioseguridad",items:[["lb1","Barbijos"],["lb2","Protección ocular"],["lb3","Guantes"],["lb4","Pilas AAA de repuesto"],["lb5","Pila CR2032"]]}]}
+]};
+// items counted by quantity (+ / −) instead of yes/no
+const MIN_DEF = {ft7:4, lb3:6};   // gasas 4, guantes 6, everything else 1
+const CANT_IDS = ["ft5","ft6","ft7","ft8","ft9","ft12","ft13","fm3","fm7","po3","po4","po5","po6","po7","po8","po9","po10","po11","ls2","ls3","lb1","lb3"];
+for (const s of DEFAULT_CATALOG.secciones) for (const c of s.categorias)
+  c.items = c.items.map(([id,nombre,tipo]) => {
+    const it = {id,nombre,tipo:tipo||(CANT_IDS.includes(id)?"cant":"sn")};
+    if (it.tipo==="cant") it.min = MIN_DEF[id] ?? 1;
+    return it;
+  });
+const SCHEMA = 3;
+
+const OPTS = { sn:[["SI","ok"],["NO","bad"]], nivel:[["ALTO","ok"],["MEDIO","warn"],["BAJO","bad"],["NO","bad"]] };
+const TIPOS = {sn:"Sí / No", cant:"Cantidad", nivel:"Nivel (O₂)"};
+const WARN_DAYS = 30, KEY = "mibolso-v2", HIST_MAX = 300;
+
+/* ---------- State ---------- */
+let S = {schema:SCHEMA, catalog:structuredClone(DEFAULT_CATALOG), valores:{}, cant:{}, venc:{}, historial:[], actualizado:null};
+let tab = "frontal", filtro = "todos", editing = false, copyFallback = "", storageOk = true, confirmDel = null;
+let sheet = null, draft = {}, draftVenc = {}, sheetQ = "";
+
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function today(){const d=new Date();d.setHours(0,0,0,0);return d}
+function daysTo(iso){if(!iso)return null;const d=new Date(iso+"T00:00:00");return Math.round((d-today())/864e5)}
+function fmtDate(iso){if(!iso)return"";return new Date(iso).toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"})}
+function fmtDay(ymd){if(!ymd)return"";const [y,m,d]=ymd.split("-");return `${d}/${m}/${y}`}
+function fmtWhen(iso){if(!iso)return"";return new Date(iso).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit"})}
+
+/* ---------- Storage ---------- */
+/* cloud = this viewer's private document in the artifact's store (only when signed in and allowed to write) */
+let cloud = null, cloudState = "local", cloudBusy = false, cloudDirty = false;
+function save(){
+  S.actualizado = new Date().toISOString();
+  try{ localStorage.setItem(KEY, JSON.stringify(S)); storageOk = true; }catch(_){ storageOk = false; }
+  if (cloud){ cloudDirty = true; pushCloud(); }
+}
+async function pushCloud(){
+  if (cloudBusy || !cloudDirty || !cloud) return;
+  cloudBusy = true; cloudDirty = false;
+  try{ await cloud.set(JSON.parse(JSON.stringify(S))); cloudState = "cloud"; }
+  catch(e){
+    if (e && (e.code==="invalid_argument" || e.code==="not_granted" || e.code==="revoked")){ cloud = null; cloudState = "local"; }
+    else { cloudDirty = true; cloudState = "retry"; setTimeout(()=>{ cloudBusy=false; pushCloud(); }, 4000); render(); return; }
+    render();
+  }
+  cloudBusy = false;
+  if (cloudDirty) pushCloud(); else render();
+}
+async function connectCloud(){
+  try{
+    if (!window.claude?.use) return;
+    const db = await window.claude.use("db"); if (!db) return;
+    const user = await window.claude.use("user"); if (!user) return;
+    const id = await user.id(); if (!id) return;
+    const ref = db.doc("data/users/" + id + "/bolso");
+    const snap = await ref.get();
+    if (snap.exists){
+      const d = snap.data();
+      if (d && d.catalog && Array.isArray(d.catalog.secciones)){
+        // keep whichever copy was changed last
+        if (!S.actualizado || (d.actualizado && d.actualizado >= S.actualizado)){
+          S = {...S, ...JSON.parse(JSON.stringify(d))}; upgrade();
+          try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(_){}
+        }
+      }
+    }
+    cloud = ref;
+    // test that this viewer may write; first write also uploads what was on this device
+    cloudDirty = true; await pushCloud();
+    render();
+  }catch(_){ cloud = null; cloudState = "local"; render(); }
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if (raw){ const d = JSON.parse(raw); S = {...S, ...d}; upgrade(); return; }
+    // migrate from the first version of the app
+    const oldE = JSON.parse(localStorage.getItem("bolso-estado")||"null");
+    const oldC = JSON.parse(localStorage.getItem("bolso-catalogo")||"null");
+    if (oldC && Array.isArray(oldC.secciones)) S.catalog = oldC;
+    if (oldE){ S.valores = {...(oldE.valores||{})}; S.venc = {...(oldE.vencimientos||{})}; }
+    if (!oldE && !oldC) return;   // brand-new device: nothing to migrate
+    S.schema = 1; upgrade(); save();
+  }catch(_){ storageOk = false; }
+}
+// data saved by an older version: switch the quantity items over (a "NO" becomes 0, a "SÍ" needs counting)
+function upgrade(){
+  const from = S.schema||1;
+  if (from >= SCHEMA) return;
+  for (const s of S.catalog.secciones) for (const c of s.categorias) for (const it of c.items){
+    if (CANT_IDS.includes(it.id) && it.tipo==="sn") it.tipo = "cant";
+    if (from < 3 && it.tipo==="cant" && it.min==null) it.min = MIN_DEF[it.id] ?? 1;
+    if (it.tipo==="cant" && it.id in S.valores){
+      if (S.valores[it.id]==="NO" && S.cant[it.id]==null) S.cant[it.id] = 0;
+      delete S.valores[it.id];
+    }
+  }
+  S.schema = SCHEMA; save();
+}
+
+/* ---------- Model helpers ---------- */
+function* each(){ for (const s of S.catalog.secciones) for (const c of s.categorias) for (const it of c.items) yield {s,c,it}; }
+function find(id){ for (const x of each()) if (x.it.id===id) return x; return null; }
+function valText(it, v){
+  if (v==null || v==="") return "—";
+  if (it.tipo==="cant") return String(v);
+  return v==="SI" ? "SÍ" : v;
+}
+function cur(it){ return it.tipo==="cant" ? (S.cant[it.id] ?? null) : (S.valores[it.id] ?? null); }
+
+function statusOf(it, c){
+  const venc = c.vence ? S.venc[it.id] : null, dd = daysTo(venc);
+  if (it.tipo==="cant"){
+    const n = S.cant[it.id];
+    if (n==null) return {level:"none",motivo:"Sin cargar"};
+    const min = it.min||0;
+    if (n===0) return {level:"bad",motivo:"Sin stock"};
+    if (min && n<min) return {level:"bad",motivo:`Faltan ${min-n}`};
+    if (dd!==null && dd<0) return {level:"bad",motivo:"Vencido"};
+    if (dd!==null && dd<=WARN_DAYS) return {level:"warn",motivo:dd===0?"Vence hoy":`Vence en ${dd} d`};
+    return {level:"ok",motivo:""};
+  }
+  const v = S.valores[it.id] ?? null;
+  if (v==="NO") return {level:"bad",motivo:"Falta"};
+  if (v==="BAJO") return {level:"bad",motivo:"Carga baja"};
+  if (dd!==null && dd<0 && v) return {level:"bad",motivo:"Vencido"};
+  if (v==="MEDIO") return {level:"warn",motivo:"Carga media"};
+  if (dd!==null && dd<=WARN_DAYS && v) return {level:"warn",motivo:dd===0?"Vence hoy":`Vence en ${dd} d`};
+  if (!v) return {level:"none",motivo:"Sin cargar"};
+  return {level:"ok",motivo:""};
+}
+function allItems(){ const out=[]; for (const x of each()) out.push({...x, st:statusOf(x.it,x.c)}); return out; }
+
+/* ---------- History ---------- */
+function logEntry(tipo, cambios, nota){
+  if (!cambios.length) return;
+  S.historial.unshift({t:new Date().toISOString(), tipo, nota:nota||"", cambios});
+  if (S.historial.length>HIST_MAX) S.historial.length = HIST_MAX;
+}
+// manual edits on the main list merge into one "Ajuste" entry within 5 minutes
+function logAjuste(it, campo, de, a){
+  const now = Date.now(), h = S.historial[0];
+  let e = (h && h.tipo==="ajuste" && now-new Date(h.t).getTime() < 5*60e3) ? h : null;
+  if (!e){ e = {t:new Date().toISOString(), tipo:"ajuste", nota:"", cambios:[]}; S.historial.unshift(e); }
+  e.t = new Date().toISOString();
+  const k = e.cambios.find(x=>x.id===it.id && x.campo===campo);
+  if (k){ k.a = a; if (k.de===k.a) e.cambios.splice(e.cambios.indexOf(k),1); }
+  else if (de!==a) e.cambios.push({id:it.id, nombre:it.nombre, tipo:it.tipo, campo, de, a});
+  if (!e.cambios.length) S.historial.shift();
+  if (S.historial.length>HIST_MAX) S.historial.length = HIST_MAX;
+}
+function changeText(ch){
+  if (ch.campo==="venc") return `${esc(ch.nombre)}: vence ${ch.de?fmtDay(ch.de):"—"} → ${ch.a?fmtDay(ch.a):"—"}`;
+  const f = v => v==null||v==="" ? "—" : (ch.tipo==="cant" ? v : (v==="SI"?"SÍ":v));
+  return `${esc(ch.nombre)}: <span class="num">${esc(f(ch.de))} → ${esc(f(ch.a))}</span>`;
+}
+
+/* ---------- Render ---------- */
+function render(){
+  const all = allItems();
+  const bad = all.filter(x=>x.st.level==="bad"), warn = all.filter(x=>x.st.level==="warn");
+  const cargados = all.filter(x=>x.st.level!=="none").length;
+  document.getElementById("m-falta").textContent = bad.length;
+  document.getElementById("m-aten").textContent = warn.length;
+  document.getElementById("m-rev").textContent = `${cargados}/${all.length}`;
+  document.getElementById("sync").textContent = (cloudState==="cloud" ? "Guardado en tu cuenta" : cloudState==="retry" ? "Sin conexión, reintentando…" : "Guardado en este navegador") + (S.actualizado ? ` · ${fmtWhen(S.actualizado)}` : "");
+  document.getElementById("notice").innerHTML =
+    (cloudState!=="cloud" ? `<p class="notice">Tu bolso se guarda sólo en este navegador. Para no perder datos, abrí el link siempre en el mismo navegador (Safari o Chrome, no dentro de otra app) y hacé una copia de seguridad desde Historial.</p>` : "") +
+    (!storageOk && cloudState!=="cloud" ? `<p class="notice">Este navegador no está guardando los datos (puede ser modo incógnito). Abrí el link en una ventana normal.</p>` : "") +
+    (cargados===0 ? `<p class="notice">Primera vez: recorré cada compartimento y cargá lo que tenés. Después sólo usás "Registrar uso" y "Reponer".</p>` : "");
+  renderSummary(bad, warn);
+  renderTabs(all);
+  renderToolbar();
+  renderMain();
+  if (sheet) renderSheet();
+}
+function groupBySection(list){
+  const g = new Map();
+  for (const x of list){ if(!g.has(x.s.id)) g.set(x.s.id,{s:x.s,items:[]}); g.get(x.s.id).items.push(x); }
+  return [...g.values()];
+}
+function renderSummary(bad, warn){
+  const el = document.getElementById("summary");
+  el.classList.toggle("clear", bad.length===0);
+  const li = (x,cls) => `<li><span><span>${esc(x.it.nombre)}</span> <span class="where">· ${esc(x.c.nombre)}</span></span><span class="pill ${cls}">${esc(x.st.motivo)}</span></li>`;
+  let html = `<div class="sum-head"><h2>${bad.length?`Faltantes (${bad.length})`:"Bolso completo"}</h2>
+    <button class="btn" id="copy" ${bad.length+warn.length?"":"disabled"}>Copiar lista para reponer</button></div>`;
+  if (!bad.length && !warn.length) html += `<p class="empty-note">No hay nada en falta, vencido ni con carga baja.</p>`;
+  for (const g of groupBySection(bad)) html += `<div class="sum-group"><h3>${esc(g.s.nombre)}</h3><ul class="sum-list">${g.items.map(x=>li(x,"bad")).join("")}</ul></div>`;
+  if (warn.length) html += `<div class="sum-group"><h3>Atención</h3><ul class="sum-list">${warn.map(x=>li(x,"warn")).join("")}</ul></div>`;
+  if (copyFallback) html += `<textarea class="copy-fallback" id="copy-text" readonly>${esc(copyFallback)}</textarea>`;
+  el.innerHTML = html;
+}
+function renderTabs(all){
+  const tabs = S.catalog.secciones.map(s=>{
+    const n = all.filter(x=>x.s.id===s.id && x.st.level==="bad").length;
+    return `<button class="tab" role="tab" data-tab="${s.id}" aria-selected="${tab===s.id}">${esc(s.nombre)}${n?`<span class="cnt">${n}</span>`:""}</button>`;
+  });
+  tabs.push(`<button class="tab" role="tab" data-tab="historial" aria-selected="${tab==="historial"}">Historial</button>`);
+  document.getElementById("tabs").innerHTML = tabs.join("");
+}
+function renderToolbar(){
+  const tb = document.getElementById("toolbar");
+  if (tab==="historial"){ tb.innerHTML=""; return; }
+  const f = [["todos","Todo"],["faltan","Faltantes"],["sin","Sin cargar"]];
+  tb.innerHTML = `<div class="seg-filter" role="group" aria-label="Filtrar">${f.map(([k,l])=>`<button data-filter="${k}" aria-pressed="${filtro===k}">${l}</button>`).join("")}</div>
+    <button class="btn" id="edit-toggle">${editing?"Listo":"Editar lista"}</button>`;
+}
+function stepper(id, val, cls, attr){
+  return `<div class="step ${cls||""}"><button type="button" data-${attr}="${id}" data-d="-1" aria-label="Restar">−</button><input type="number" inputmode="numeric" min="0" id="${attr}-${id}" data-${attr}-in="${id}" value="${val??""}" placeholder="—" aria-label="Cantidad"><button type="button" data-${attr}="${id}" data-d="1" aria-label="Sumar">+</button></div>`;
+}
+function control(it, st){
+  if (it.tipo==="cant"){
+    const n = S.cant[it.id];
+    return `<div class="opts">${stepper(it.id, n, st.level==="bad"?"bad":"", "q")}</div>`;
+  }
+  const v = S.valores[it.id] ?? null;
+  return `<div class="opts" role="group" aria-label="Estado de ${esc(it.nombre)}">${OPTS[it.tipo].map(([o,cls])=>
+    `<button class="opt ${cls} ${v===o?"on":""}" data-set="${it.id}" data-v="${o}" aria-pressed="${v===o}">${o==="SI"?"SÍ":o}</button>`).join("")}</div>`;
+}
+function renderMain(){
+  const main = document.getElementById("main");
+  if (tab==="historial"){ main.innerHTML = renderHistory(); return; }
+  const s = S.catalog.secciones.find(x=>x.id===tab) || S.catalog.secciones[0];
+  let html = "";
+  for (const c of s.categorias){
+    let items = c.items.map(it=>({it,st:statusOf(it,c)}));
+    const nb = items.filter(x=>x.st.level==="bad").length;
+    if (!editing){
+      if (filtro==="faltan") items = items.filter(x=>x.st.level==="bad"||x.st.level==="warn");
+      if (filtro==="sin") items = items.filter(x=>x.st.level==="none");
+      if (!items.length && filtro!=="todos") continue;
+    }
+    html += `<section class="cat"><div class="cat-head"><h3>${esc(c.nombre)}</h3><span class="num">${nb?`${nb} faltan · `:""}${c.items.length} ítems</span></div><ul class="rows">`;
+    for (const {it,st} of items){
+      if (editing){
+        html += `<li class="row"><div class="edit-row">
+          <input type="text" id="ren-${it.id}" value="${esc(it.nombre)}" data-rename="${it.id}" aria-label="Nombre">
+          <select id="tipo-${it.id}" data-tipo="${it.id}" aria-label="Tipo">${Object.entries(TIPOS).map(([k,l])=>`<option value="${k}" ${it.tipo===k?"selected":""}>${l}</option>`).join("")}</select>
+          ${it.tipo==="cant"?`<label>Mínimo <input type="number" min="0" id="min-${it.id}" data-min="${it.id}" value="${it.min??""}"></label>`:""}
+          ${confirmDel===it.id?`<button class="btn danger" data-delyes="${it.id}">Confirmar</button><button class="btn" data-delno="1">No</button>`:`<button class="btn danger" data-del="${it.id}">Quitar</button>`}
+        </div></li>`;
+        continue;
+      }
+      const sub = [];
+      if (it.tipo==="cant") sub.push(`<span class="of">${it.min?`mínimo ${it.min}`:"sin mínimo"}</span>`);
+      if (c.vence) sub.push(`<label for="v-${it.id}">Vence</label><input type="date" id="v-${it.id}" data-venc="${it.id}" value="${esc(S.venc[it.id]||"")}">`);
+      if (st.level!=="ok" && st.level!=="none" && !["Falta","Sin stock"].includes(st.motivo) && !st.motivo.startsWith("Faltan")) sub.push(`<span class="pill ${st.level}">${esc(st.motivo)}</span>`);
+      else if (st.level==="bad") sub.push(`<span class="pill bad">${esc(st.motivo)}</span>`);
+      html += `<li class="row ${st.level==="bad"?"is-bad":""}"><div class="name"><span>${esc(it.nombre)}</span>${sub.length?`<span class="sub">${sub.join("")}</span>`:""}</div>${control(it,st)}</li>`;
+    }
+    html += `</ul>`;
+    if (editing) html += `<form class="add-row" data-add="${c.id}"><input id="add-${c.id}" placeholder="Agregar elemento a ${esc(c.nombre)}" aria-label="Nuevo elemento"><button class="btn primary">Agregar</button></form>`;
+    html += `</section>`;
+  }
+  if (!html) html = `<p class="none">${filtro==="faltan"?"No falta nada en este compartimento.":"Todo cargado en este compartimento."}</p>`;
+  main.innerHTML = html;
+}
+const TIPO_LBL = {uso:["Uso en emergencia","bad"], repo:["Reposición","ok"], ajuste:["Ajuste manual","info"]};
+function renderHistory(){
+  let html = "";
+  if (!S.historial.length) html += `<p class="none" style="margin-top:12px">Todavía no hay movimientos. Cada uso, reposición o cambio que hagas queda registrado acá con fecha y hora.</p>`;
+  else html += `<ul class="hist">` + S.historial.map(h=>{
+    const [l,cls] = TIPO_LBL[h.tipo]||[h.tipo,"info"];
+    return `<li><div class="h-top"><span class="pill ${cls}">${l}</span><span class="num" style="font-size:13px;color:var(--muted)">${fmtWhen(h.t)}</span></div>
+      ${h.nota?`<div class="h-note">${esc(h.nota)}</div>`:""}
+      <div class="h-items">${h.cambios.map(ch=>`<span>${changeText(ch)}</span>`).join("")}</div></li>`;
+  }).join("") + `</ul>`;
+  html += `<section class="backup"><h3>Copia de seguridad</h3>
+    <p>Tu inventario se guarda en este celular. Descargá una copia de vez en cuando; si cambiás de teléfono o se borran los datos del navegador, la restaurás desde acá.</p>
+    <div class="acts"><button class="btn" id="bk-down">Descargar copia</button><button class="btn" id="bk-copy">Copiar como texto</button>
+    <label class="btn" for="bk-file" style="display:inline-flex;align-items:center">Restaurar copia</label><input type="file" id="bk-file" accept=".json,application/json,text/plain" hidden></div>
+    <textarea class="copy-fallback" id="bk-text" placeholder="…o pegá acá el texto de una copia y tocá Restaurar texto" aria-label="Texto de la copia"></textarea>
+    <div class="acts"><button class="btn" id="bk-paste">Restaurar texto</button></div></section>`;
+  return html;
+}
+
+/* ---------- Sheets: uso / reponer ---------- */
+function openSheet(kind){
+  sheet = kind; draft = {}; draftVenc = {}; sheetQ = "";
+  document.getElementById("sheet-q").value = "";
+  document.getElementById("sheet-note").value = "";
+  document.getElementById("sheet").hidden = false;
+  document.body.style.overflow = "hidden";
+  renderSheet();
+}
+function closeSheet(){ sheet=null; document.getElementById("sheet").hidden = true; document.body.style.overflow = ""; }
+function sheetItems(){
+  const q = sheetQ.trim().toLowerCase();
+  let list = allItems();
+  if (sheet==="repo") list = list.filter(x=>x.st.level==="bad"||x.st.level==="warn"||draft[x.it.id]!==undefined||draftVenc[x.it.id]!==undefined);
+  if (q) list = allItems().filter(x=>x.it.nombre.toLowerCase().includes(q));
+  return list;
+}
+function renderSheet(){
+  const uso = sheet==="uso";
+  document.getElementById("sheet-title").textContent = uso ? "Registrar uso" : "Reponer";
+  document.getElementById("sheet-help").textContent = uso
+    ? "Marcá lo que usaste en la atención. Se descuenta del inventario."
+    : "Marcá lo que repusiste. Abajo aparecen los faltantes; buscá arriba para reponer otra cosa.";
+  const list = sheetItems();
+  let html = "";
+  for (const g of groupBySection(list)){
+    html += `<section class="cat"><div class="cat-head"><h3>${esc(g.s.nombre)}</h3></div><ul class="rows">`;
+    for (const x of g.items){
+      const it = x.it, id = it.id, d = draft[id], picked = d!==undefined || draftVenc[id]!==undefined;
+      let ctl = "", sub = [`<span class="where" style="font-size:13px;color:var(--muted)">${esc(x.c.nombre)}</span>`];
+      if (it.tipo==="cant"){
+        const have = S.cant[id];
+        sub.push(`<span class="of">hay ${have??"—"}${it.min?` · mín. ${it.min}`:""}</span>`);
+        ctl = `<span class="of">${uso?"usé":"agrego"}</span>${stepper(id, d??0, "", "dq")}`;
+      } else if (it.tipo==="nivel"){
+        sub.push(`<span class="of">ahora ${valText(it, S.valores[id])}</span>`);
+        ctl = `<div class="opts">${OPTS.nivel.map(([o,cls])=>`<button class="opt ${cls} ${d===o?"on":""}" data-dlev="${id}" data-v="${o}" aria-pressed="${d===o}">${o}</button>`).join("")}</div>`;
+      } else {
+        sub.push(`<span class="of">ahora ${valText(it, S.valores[id])}</span>`);
+        ctl = `<button class="toggle ${d?"on":""}" data-dtog="${id}" aria-pressed="${!!d}">${uso?(d?"Usado ✓":"Usé"):(d?"Repuesto ✓":"Repuse")}</button>`;
+      }
+      if (!uso && x.c.vence) sub.push(`<label for="dv-${id}">Nuevo vencimiento</label><input type="date" id="dv-${id}" data-dvenc="${id}" value="${esc(draftVenc[id]??S.venc[id]??"")}" style="border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:2px 6px;font-size:13px">`);
+      if (!uso && x.st.motivo && x.st.level!=="none") sub.push(`<span class="pill ${x.st.level}">${esc(x.st.motivo)}</span>`);
+      html += `<li class="row ${picked?"picked":""}"><div class="name"><span>${esc(it.nombre)}</span><span class="sub">${sub.join("")}</span></div><div class="opts" style="align-items:center">${ctl}</div></li>`;
+    }
+    html += `</ul></section>`;
+  }
+  if (!list.length) html = `<p class="none">${sheetQ?"No hay elementos con ese nombre.":(uso?"":"No hay faltantes. Buscá arriba si querés reponer algo puntual.")}</p>`;
+  document.getElementById("sheet-list").innerHTML = html;
+  const n = Object.keys(draft).length + Object.keys(draftVenc).filter(k=>draft[k]===undefined).length;
+  const btn = document.getElementById("sheet-save");
+  btn.textContent = uso ? `Guardar uso${n?` (${n})`:""}` : `Guardar reposición${n?` (${n})`:""}`;
+  btn.disabled = !n;
+}
+function applySheet(){
+  const uso = sheet==="uso", cambios = [];
+  for (const [id, d] of Object.entries(draft)){
+    const x = find(id); if (!x) continue; const it = x.it;
+    if (it.tipo==="cant"){
+      const n = Number(d)||0; if (!n) continue;
+      const de = S.cant[id] ?? 0, a = uso ? Math.max(0, de-n) : de+n;
+      S.cant[id] = a; cambios.push({id, nombre:it.nombre, tipo:"cant", campo:"v", de, a});
+    } else {
+      const de = S.valores[id] ?? null;
+      const a = it.tipo==="nivel" ? d : (uso ? "NO" : "SI");
+      if (de===a) continue;
+      S.valores[id] = a; cambios.push({id, nombre:it.nombre, tipo:it.tipo, campo:"v", de, a});
+    }
+  }
+  if (!uso) for (const [id, date] of Object.entries(draftVenc)){
+    const x = find(id); if (!x) continue;
+    const de = S.venc[id] ?? null, a = date || null;
+    if (de===a) continue;
+    S.venc[id] = a; cambios.push({id, nombre:x.it.nombre, tipo:x.it.tipo, campo:"venc", de, a});
+  }
+  const nota = document.getElementById("sheet-note").value.trim();
+  logEntry(uso?"uso":"repo", cambios, nota);
+  save(); closeSheet(); render();
+  toast(cambios.length ? (uso?"Uso registrado":"Reposición registrada") : "No hubo cambios");
+}
+
+/* ---------- Direct edits on the main list ---------- */
+function setValue(id, v){
+  const x = find(id); if (!x) return;
+  const de = S.valores[id] ?? null, a = de===v ? null : v;
+  S.valores[id] = a; logAjuste(x.it, "v", de, a); save(); render();
+}
+function setCant(id, n){
+  const x = find(id); if (!x) return;
+  const de = S.cant[id] ?? null;
+  const a = (n===null || n==="" || isNaN(n)) ? null : Math.max(0, Math.round(n));
+  if (de===a) return;
+  S.cant[id] = a; logAjuste(x.it, "v", de, a); save(); render();
+}
+function setVenc(id, val){
+  const x = find(id); if (!x) return;
+  const de = S.venc[id] ?? null, a = val || null;
+  S.venc[id] = a; logAjuste(x.it, "venc", de, a); save(); render();
+}
+function findCat(catId){ for(const s of S.catalog.secciones) for(const c of s.categorias) if(c.id===catId) return c; }
+function addItem(catId, nombre){
+  nombre = nombre.trim(); if(!nombre) return;
+  const c = findCat(catId); if(!c) return;
+  c.items.push({id:catId+"-"+Date.now().toString(36), nombre, tipo:"sn"});
+  save(); render(); setTimeout(()=>document.getElementById("add-"+catId)?.focus(),0);
+}
+function delItem(id){
+  for(const s of S.catalog.secciones) for(const c of s.categorias){ const i=c.items.findIndex(x=>x.id===id); if(i>=0) c.items.splice(i,1); }
+  delete S.valores[id]; delete S.cant[id]; delete S.venc[id];
+  confirmDel = null; save(); render();
+}
+
+/* ---------- Copy / backup ---------- */
+function buildCopyText(){
+  const all = allItems();
+  const bad = all.filter(x=>x.st.level==="bad"), warn = all.filter(x=>x.st.level==="warn");
+  let t = `Bolso paramédico – reposición al ${fmtDate(new Date().toISOString())}\n`;
+  for (const g of groupBySection(bad)){ t += `\n${g.s.nombre.toUpperCase()}\n`; for (const x of g.items){
+    const extra = x.it.tipo==="cant" && x.it.min ? ` – faltan ${Math.max(0,x.it.min-(S.cant[x.it.id]||0))}` : (x.st.motivo!=="Falta"?` (${x.st.motivo.toLowerCase()})`:"");
+    t += `• ${x.it.nombre}${extra}\n`; } }
+  if (warn.length){ t += `\nATENCIÓN\n`; for (const x of warn) t += `• ${x.it.nombre} (${x.st.motivo.toLowerCase()})\n`; }
+  return t.trim();
+}
+async function copyText(txt, okMsg){
+  try{ await navigator.clipboard.writeText(txt); toast(okMsg); return true; }catch(_){ return false; }
+}
+function restoreFrom(text){
+  try{
+    const d = JSON.parse(text);
+    if (!d || !d.catalog || !Array.isArray(d.catalog.secciones)) throw 0;
+    S = {schema:d.schema||1, catalog:d.catalog, valores:d.valores||{}, cant:d.cant||{}, venc:d.venc||{}, historial:d.historial||[], actualizado:null};
+    upgrade(); save(); render(); toast("Copia restaurada");
+  }catch(_){ toast("Ese archivo no es una copia válida de Mi Bolso"); }
+}
+
+let toastT;
+function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2400); }
+
+/* ---------- Events ---------- */
+document.addEventListener("click", async e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  const ds = b.dataset;
+  if (ds.set) return setValue(ds.set, ds.v);
+  if (ds.q){ const n = S.cant[ds.q] ?? 0; return setCant(ds.q, n + Number(ds.d)); }
+  if (ds.dq){ const n = Number(draft[ds.dq]||0) + Number(ds.d); if (n<=0) delete draft[ds.dq]; else draft[ds.dq]=n; return renderSheet(); }
+  if (ds.dtog){ if (draft[ds.dtog]) delete draft[ds.dtog]; else draft[ds.dtog]=true; return renderSheet(); }
+  if (ds.dlev){ if (draft[ds.dlev]===ds.v) delete draft[ds.dlev]; else draft[ds.dlev]=ds.v; return renderSheet(); }
+  if (ds.tab){ tab=ds.tab; try{localStorage.setItem("mibolso-tab",tab)}catch(_){}; return render(); }
+  if (ds.filter){ filtro=ds.filter; return render(); }
+  if (ds.del){ confirmDel = ds.del; return render(); }
+  if (ds.delyes) return delItem(ds.delyes);
+  if (ds.delno){ confirmDel=null; return render(); }
+  switch (b.id){
+    case "edit-toggle": editing=!editing; confirmDel=null; if(editing) filtro="todos"; return render();
+    case "open-uso": return openSheet("uso");
+    case "open-repo": return openSheet("repo");
+    case "sheet-close": return closeSheet();
+    case "sheet-save": return applySheet();
+    case "copy": {
+      const txt = buildCopyText();
+      if (await copyText(txt,"Lista copiada")){ copyFallback=""; }
+      else { copyFallback = txt; render(); const ta=document.getElementById("copy-text"); ta?.focus(); ta?.select(); toast("Seleccioná y copiá el texto"); }
+      return;
+    }
+    case "bk-down": {
+      try{
+        const blob = new Blob([JSON.stringify(S)],{type:"application/json"});
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+        a.download = `mi-bolso-${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+        toast("Copia descargada");
+      }catch(_){ toast("No se pudo descargar. Usá Copiar como texto."); }
+      return;
+    }
+    case "bk-copy": {
+      const txt = JSON.stringify(S);
+      if (!(await copyText(txt,"Copia copiada. Guardala en notas o mandátela por WhatsApp."))){
+        const ta = document.getElementById("bk-text"); ta.value = txt; ta.focus(); ta.select(); toast("Seleccioná y copiá el texto");
+      }
+      return;
+    }
+    case "bk-paste": return restoreFrom(document.getElementById("bk-text").value);
+  }
+});
+document.addEventListener("change", e=>{
+  const t = e.target, ds = t.dataset;
+  if (ds.venc) setVenc(ds.venc, t.value);
+  if (ds.qIn) setCant(ds.qIn, t.value===""?null:Number(t.value));
+  if (ds.dqIn){ const n = Math.max(0, Number(t.value)||0); if (n) draft[ds.dqIn]=n; else delete draft[ds.dqIn]; renderSheet(); }
+  if (ds.dvenc){ draftVenc[ds.dvenc] = t.value; renderSheet(); }
+  if (ds.rename){ const x = find(ds.rename); const v = t.value.trim(); if (x && v && v!==x.it.nombre){ x.it.nombre = v; save(); } }
+  if (ds.tipo){ const x = find(ds.tipo); if (x){ x.it.tipo = t.value; if (t.value!=="cant") delete x.it.min; save(); render(); } }
+  if (ds.min){ const x = find(ds.min); if (x){ const n = Number(t.value); if (t.value==="" || !n) delete x.it.min; else x.it.min = Math.max(0, Math.round(n)); save(); render(); } }
+  if (t.id==="bk-file" && t.files?.[0]){ const r = new FileReader(); r.onload = ()=>restoreFrom(String(r.result)); r.readAsText(t.files[0]); t.value=""; }
+});
+document.getElementById("sheet-q").addEventListener("input", e=>{ sheetQ = e.target.value; renderSheet(); });
+document.addEventListener("submit", e=>{
+  const f = e.target.closest("form[data-add]"); if(!f) return; e.preventDefault();
+  addItem(f.dataset.add, f.querySelector("input").value);
+});
+document.addEventListener("keydown", e=>{ if (e.key==="Escape" && sheet) closeSheet(); });
+
+/* ---------- Boot ---------- */
+load();
+connectCloud();
+try{ const t = localStorage.getItem("mibolso-tab"); if (t) tab = t; }catch(_){}
+try{ navigator.storage?.persist?.(); }catch(_){}
+render();
+</script>
+
+</body>
+</html>

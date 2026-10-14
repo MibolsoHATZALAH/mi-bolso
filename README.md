@@ -37,7 +37,7 @@ Cada cambio guarda el inventario y su movimiento en un mismo batch. Los cambios 
 
 ### 2. Vercel
 1. [vercel.com](https://vercel.com) → entrar con GitHub → **Add New → Project** → importar `MibolsoHATZALAH/mi-bolso`.
-2. Framework: Next.js (se detecta solo). En **Environment Variables** cargar las 6 variables de `.env.example` con los valores de `firebaseConfig`.
+2. Framework: Next.js (se detecta solo). La config pública de Firebase ya está en `lib/firebase.ts`; las variables de `.env.example` sólo hacen falta para apuntar a otro proyecto.
 3. **Deploy**. Vercel publica en `<proyecto>.vercel.app` y redeploya en cada push a la rama de producción.
 
 ### 3. Dominio autorizado
@@ -51,6 +51,10 @@ npm install
 npm run dev                  # http://localhost:3000 (localhost ya está autorizado en Firebase)
 npm test                     # lógica del inventario
 ```
+
+## Versión anterior
+
+`index.html` en la raíz es la versión anterior (una sola página que guardaba en el navegador). Next.js lo ignora; GitHub Pages lo sigue sirviendo en `mibolsohatzalah.github.io/mi-bolso` para que los voluntarios puedan exportar su copia.
 
 ## Migrar desde la versión anterior
 
