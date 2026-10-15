@@ -419,3 +419,48 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 .bags.dos .bag-side{align-items:flex-start;max-width:100%}
 .bags.dos .servicio{font-size:12px;padding:6px 10px 6px 8px}
 @media (max-width:420px){ .meter.cuatro .tile{padding:8px 8px} .meter.cuatro .tile b{font-size:20px} .meter.cuatro .tile span{font-size:11px} }
+
+/* ---------- shared bags: search, neighborhood chips, attention section, 4 per row ---------- */
+.filtros{margin-top:16px;display:flex;flex-direction:column;gap:10px}
+.buscar input{width:100%;border:.5px solid var(--glass-edge);background:var(--glass);border-radius:14px;padding:11px 14px 11px 38px;font-size:17px;
+  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);box-shadow:inset 0 1px 0 var(--glass-shine),var(--shadow);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:12px center}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0 4px;margin:0 -16px;padding-inline:16px}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;border:.5px solid var(--glass-edge);background:var(--glass);border-radius:999px;padding:7px 14px;font-size:14px;font-weight:600;color:var(--ink);
+  box-shadow:inset 0 1px 0 var(--glass-shine),0 1px 3px rgba(0,0,0,.06)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:transparent;color:var(--accent-ink);box-shadow:0 4px 12px color-mix(in srgb,var(--accent) 35%,transparent)}
+.seg-filter .seg-label{align-self:center;font-size:13px;color:var(--muted);padding:0 8px 0 4px}
+.seg-filter button[aria-label$="por fila"]{min-width:38px;font-weight:600}
+.atencion .barrio-head span:first-child{color:var(--bad)}
+.atencion .barrio-head .barrio-n{background:var(--bad);color:#fff}
+.atencion-nota{margin:-6px 4px 10px;font-size:14px;color:var(--muted)}
+.bag-barrio{align-self:flex-start;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--accent);margin-bottom:-2px}
+.t-corto{display:none}
+
+/* 4 per row: name, status and the service dot only */
+.bags.cuatro{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.bags.cuatro > li{min-width:0;display:flex}
+.bags.cuatro .bag{padding:9px 8px;border-radius:14px;align-items:stretch;gap:0}
+.bags.cuatro .bag-main{gap:5px}
+.bags.cuatro .bag-top{flex-direction:column;gap:5px}
+.bags.cuatro .bag-name{font-size:13px;line-height:1.15;letter-spacing:-.01em}
+.bags.cuatro .bag-side{align-items:flex-start;max-width:100%}
+.bags.cuatro .bag-barrio{font-size:9px}
+.bags.cuatro .servicio{padding:4px;gap:0}
+.bags.cuatro .servicio-txt,.bags.cuatro .bag-horario,.bags.cuatro .bag-where,.bags.cuatro .bag-miss,.bags.cuatro .bag-pills,
+.bags.cuatro .bag-when,.bags.cuatro .chev,.bags.cuatro .t-largo{display:none}
+.bags.cuatro .t-corto{display:inline}
+.bags.cuatro .bag-estado{font-size:12px;font-weight:800;padding:4px 7px 4px 4px;gap:4px;align-self:stretch;margin-top:auto;line-height:1.1}
+.bags.cuatro .bag-estado.none{font-size:11px;padding-left:7px}
+.bags.cuatro .bag-estado-icon{width:16px;height:16px;font-size:9px;flex:0 0 auto}
+@media (min-width:700px){
+  .bags.cuatro{gap:10px}
+  .bags.cuatro .bag{padding:12px}
+  .bags.cuatro .bag-name{font-size:16px}
+  .bags.cuatro .bag-estado{font-size:15px}
+  .bags.cuatro .bag-horario{display:inline-block;font-size:11px}
+  .bags.cuatro .servicio{padding:5px 9px 5px 7px;gap:6px}
+  .bags.cuatro .servicio-txt{display:inline;font-size:11px}
+}

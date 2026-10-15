@@ -199,17 +199,50 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
 }) {
   const [nuevo, setNuevo] = useState(false);
   const [copyFallback, setCopyFallback] = useState("");
-  const datos = useMemo(() => bolsos.map((b) => ({ b, r: resumen(b.bolso), av: alertasVenc(b.bolso) })), [bolsos]);
+  const datos: Dato[] = useMemo(() => bolsos.map((b) => ({ b, r: resumen(b.bolso), av: alertasVenc(b.bolso) })), [bolsos]);
+  const barrioDe = (x: Dato) => x.b.barrio.trim() || "Sin barrio";
+  const rank = (k: string) => { const i = BARRIOS.findIndex((x) => x.toLowerCase() === k.toLowerCase()); return k === "Sin barrio" ? 1e4 : i < 0 ? 1e3 : i; };
+  const todosLosBarrios = useMemo(() => [...new Set(datos.map(barrioDe))].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, "es")), [datos]);
+
+  // view settings, remembered on each phone
+  const [cols, setCols] = useState<1 | 2 | 4>(1);
+  const [barrio, setBarrio] = useState("");
+  const [q, setQ] = useState("");
+  useEffect(() => {
+    try {
+      const c = localStorage.getItem("bolsos-columnas"); if (c === "2" || c === "4") setCols(Number(c) as 2 | 4);
+      const b = localStorage.getItem("bolsos-barrio"); if (b) setBarrio(b);
+    } catch {}
+  }, []);
+  const elegirCols = (n: 1 | 2 | 4) => { setCols(n); try { localStorage.setItem("bolsos-columnas", String(n)); } catch {} };
+  const elegirBarrio = (b: string) => { setBarrio(b); try { localStorage.setItem("bolsos-barrio", b); } catch {} };
+  const barrioActivo = barrio && todosLosBarrios.includes(barrio) ? barrio : "";
+
+  // filter: neighborhood chip + search box (neighborhood, name or address; "11" finds Once)
+  const visibles = useMemo(() => {
+    const t = normalizar(q).replace(/^barrio\s+/, "");
+    const claves = t ? [t, ...(SINONIMOS[t] ?? [])] : [];
+    return datos.filter((x) => {
+      if (barrioActivo && barrioDe(x) !== barrioActivo) return false;
+      if (!claves.length) return true;
+      const texto = normalizar([x.b.barrio, x.b.nombre, x.b.direccion, x.b.ubicacion].join(" "));
+      return claves.some((k) => texto.includes(k));
+    });
+  }, [datos, barrioActivo, q]);
+
+  // out of service or incomplete → on top, once (taken out of their neighborhood)
+  const necesitaAtencion = (x: Dato) => x.b.fueraDeServicio || (x.r.cargados > 0 && x.r.faltan > 0);
+  const atencion = useMemo(() => visibles.filter(necesitaAtencion)
+    .sort((a, b) => Number(b.b.fueraDeServicio) - Number(a.b.fueraDeServicio) || b.r.faltan - a.r.faltan || a.b.nombre.localeCompare(b.b.nombre, "es")), [visibles]);
   // grouped by neighborhood, in the spreadsheet's order; unknown ones after, bags without one last
   const grupos = useMemo(() => {
-    const m = new Map<string, typeof datos>();
-    for (const x of datos) { const k = x.b.barrio.trim() || "Sin barrio"; if (!m.has(k)) m.set(k, []); m.get(k)!.push(x); }
-    const rank = (k: string) => { const i = BARRIOS.findIndex((x) => x.toLowerCase() === k.toLowerCase()); return k === "Sin barrio" ? 1e4 : i < 0 ? 1e3 : i; };
+    const m = new Map<string, Dato[]>();
+    for (const x of visibles) { if (necesitaAtencion(x)) continue; const k = barrioDe(x); if (!m.has(k)) m.set(k, []); m.get(k)!.push(x); }
     return [...m.entries()].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b, "es")).map(([barrio, items]) => ({ barrio, items }));
-  }, [datos]);
-  const [cols, setCols] = useState<1 | 2>(1);
-  useEffect(() => { try { if (localStorage.getItem("bolsos-columnas") === "2") setCols(2); } catch {} }, []);
-  const elegirCols = (n: 1 | 2) => { setCols(n); try { localStorage.setItem("bolsos-columnas", String(n)); } catch {} };
+  }, [visibles]);
+  const filtrando = !!barrioActivo || !!q.trim();
+  const claseCols = cols === 4 ? "cuatro" : cols === 2 ? "dos" : "";
+  const card = (x: Dato, conBarrio = false) => <BagCard key={x.b.id} x={x} user={user} toast={toast} onOpen={onOpen} conBarrio={conBarrio} />;
   const activos = datos.filter((x) => !x.b.fueraDeServicio);
   const fueraN = datos.length - activos.length;
   const conFaltantes = activos.filter((x) => x.r.cargados && x.r.faltan).length;
@@ -260,74 +293,45 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
         </p>
       )}
 
-      {bolsos.length > 1 && (
-        <div className="toolbar vista">
-          <span className="vista-label">{grupos.length > 1 ? `${bolsos.length} bolsos en ${grupos.length} barrios` : `${bolsos.length} bolsos`}</span>
-          <div className="seg-filter" role="group" aria-label="Columnas">
-            <button aria-pressed={cols === 1} onClick={() => elegirCols(1)}>1 columna</button>
-            <button aria-pressed={cols === 2} onClick={() => elegirCols(2)}>2 columnas</button>
+      {bolsos.length > 1 && (<>
+        <div className="filtros">
+          <div className="buscar">
+            <input type="search" id="bolsos-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar barrio, bolso o dirección" aria-label="Buscar barrio, bolso o dirección" />
+          </div>
+          <div className="chips" role="group" aria-label="Filtrar por barrio">
+            <button className="chip" aria-pressed={!barrioActivo} onClick={() => elegirBarrio("")}>Todos</button>
+            {todosLosBarrios.map((b) => <button key={b} className="chip" aria-pressed={barrioActivo === b} onClick={() => elegirBarrio(barrioActivo === b ? "" : b)}>{b}</button>)}
           </div>
         </div>
+        <div className="toolbar vista">
+          <span className="vista-label">
+            {filtrando ? `${visibles.length} de ${bolsos.length} bolsos` : todosLosBarrios.length > 1 ? `${bolsos.length} bolsos en ${todosLosBarrios.length} barrios` : `${bolsos.length} bolsos`}
+            {filtrando && <> · <button className="link-btn" onClick={() => { setQ(""); elegirBarrio(""); }}>ver todos</button></>}
+          </span>
+          <div className="seg-filter" role="group" aria-label="Bolsos por fila">
+            <button aria-pressed={cols === 1} onClick={() => elegirCols(1)} aria-label="1 por fila">1</button>
+            <button aria-pressed={cols === 2} onClick={() => elegirCols(2)} aria-label="2 por fila">2</button>
+            <button aria-pressed={cols === 4} onClick={() => elegirCols(4)} aria-label="4 por fila">4</button>
+            <span className="seg-label" aria-hidden="true">por fila</span>
+          </div>
+        </div>
+      </>)}
+
+      {filtrando && !visibles.length && <p className="none" style={{ marginTop: 16 }}>No hay bolsos que coincidan con la búsqueda.</p>}
+
+      {atencion.length > 0 && (
+        <section className="barrio atencion">
+          <h2 className="barrio-head"><span>Atención</span><span className="barrio-n">{atencion.length}</span></h2>
+          <p className="atencion-nota">Fuera de servicio o con faltantes</p>
+          <ul className={`bags ${claseCols}`}>{atencion.map((x) => card(x, true))}</ul>
+        </section>
       )}
 
       {grupos.map((g) => (
-      <section className="barrio" key={g.barrio}>
-      {grupos.length > 1 && <h2 className="barrio-head"><span>{g.barrio}</span><span className="barrio-n">{g.items.length}</span></h2>}
-      <ul className={`bags ${cols === 2 ? "dos" : ""}`}>
-        {g.items.map(({ b, r, av }) => {
-          const dias = diasDesde(b.actualizado);
-          const viejo = r.cargados > 0 && dias !== null && dias >= STALE_DAYS;
-          const parcial = r.cargados > 0 && r.cargados < r.total;
-          const fuera = b.fueraDeServicio;
-          const estado = fuera ? "fuera" : !r.cargados ? "none" : r.faltan ? "bad" : r.atencion || parcial ? "warn" : "ok";
-          return (
-            <li key={b.id}>
-              {/* the whole card opens the bag (stretched button); the service switch sits on top of it */}
-              <div className={`bag ${estado}`}>
-                <span className="bag-main">
-                  <span className="bag-top">
-                    <button className="bag-open bag-name" onClick={() => onOpen(b.id)}>{b.nombre}</button>
-                    <span className="bag-side">
-                      <ServicioBoton b={b} user={user} toast={toast} />
-                      {b.horario && <span className="bag-horario">{b.horario}</span>}
-                    </span>
-                  </span>
-                  {(b.direccion || b.ubicacion) && <span className="bag-where">{[b.direccion, b.ubicacion].filter(Boolean).join(" · ")}</span>}
-                  {/* big, readable status: what a dispatcher needs in an emergency */}
-                  {fuera && (<>
-                    <span className="bag-estado fuera"><span className="bag-estado-icon" aria-hidden="true">⛔</span>Fuera de servicio</span>
-                    <span className="bag-when">No contar con este bolso{b.servicioDesde ? ` · desde ${hace(b.servicioDesde)}` : ""}{b.servicioPor ? ` · marcado por ${b.servicioPor}` : ""}</span>
-                  </>)}
-                  {!fuera && <>
-                  {!r.cargados && <span className="bag-estado none">Sin cargar</span>}
-                  {r.cargados > 0 && r.faltan > 0 && (
-                    <span className="bag-estado bad"><span className="bag-estado-icon" aria-hidden="true">✕</span>{r.faltan === 1 ? "Falta 1 elemento" : `Faltan ${r.faltan} elementos`}</span>
-                  )}
-                  {r.cargados > 0 && !r.faltan && !parcial && <span className="bag-estado ok"><span className="bag-estado-icon" aria-hidden="true">✓</span>Completo</span>}
-                  {!r.faltan && parcial && <span className="bag-estado warn"><span className="bag-estado-icon" aria-hidden="true">!</span>Revisado {r.cargados} de {r.total}</span>}
-                  {r.faltan > 0 && (
-                    <ul className="bag-miss">
-                      {r.bad.slice(0, 6).map((x) => <li key={x.it.id}><span>{x.it.nombre}</span><span className="bag-miss-motivo">{x.st.motivo}</span></li>)}
-                      {r.faltan > 6 && <li className="mas">y {r.faltan - 6} más</li>}
-                    </ul>
-                  )}
-                  <span className="bag-pills">
-                    {av.some((a) => a.dias < 0) && <span className="pill bad">{av.filter((a) => a.dias < 0).length} vencido{av.filter((a) => a.dias < 0).length > 1 ? "s" : ""}</span>}
-                    {av.some((a) => a.dias >= 0) && <span className="pill warn">{av.filter((a) => a.dias >= 0).length} por vencer</span>}
-                    {r.atencion > 0 && <span className="pill warn">{r.atencion} atención</span>}
-                    {r.faltan > 0 && parcial && <span className="pill warn">Revisado {r.cargados} de {r.total}</span>}
-                    {viejo && <span className="pill warn">Sin revisar hace {dias} días</span>}
-                  </span>
-                  <span className="bag-when">{b.actualizado ? `Revisado ${hace(b.actualizado)}${b.por ? ` por ${b.por}` : ""}` : "Nadie lo revisó todavía"}</span>
-                  </>}
-                </span>
-                <span className="chev" aria-hidden="true">›</span>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      </section>
+        <section className="barrio" key={g.barrio}>
+          {(grupos.length > 1 || atencion.length > 0) && <h2 className="barrio-head"><span>{g.barrio}</span><span className="barrio-n">{g.items.length}</span></h2>}
+          <ul className={`bags ${claseCols}`}>{g.items.map((x) => card(x))}</ul>
+        </section>
       ))}
     </div>
   );
@@ -363,6 +367,71 @@ function NuevoBolso({ bolsos, onDone, toast }: { bolsos: BolsoInst[]; onDone: (i
   );
 }
 
+type Dato = { b: BolsoInst; r: ReturnType<typeof resumen>; av: ReturnType<typeof alertasVenc> };
+const normalizar = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+/** What people type for a neighborhood (speech-to-text writes "Once" as "11"). */
+const SINONIMOS: Record<string, string[]> = { "11": ["once"], "once": ["11"], "v crespo": ["villa crespo"], "chaca": ["chacarita"] };
+
+/** One bag in the list. In 4-per-row mode the CSS shows only name, status and the service dot. */
+function BagCard({ x, user, toast, onOpen, conBarrio }: { x: Dato; user: User; toast: (m: string) => void; onOpen: (id: string) => void; conBarrio?: boolean }) {
+  const { b, r, av } = x;
+  const dias = diasDesde(b.actualizado);
+  const viejo = r.cargados > 0 && dias !== null && dias >= STALE_DAYS;
+  const parcial = r.cargados > 0 && r.cargados < r.total;
+  const fuera = b.fueraDeServicio;
+  const estado = fuera ? "fuera" : !r.cargados ? "none" : r.faltan ? "bad" : r.atencion || parcial ? "warn" : "ok";
+  const vencidos = av.filter((a) => a.dias < 0).length, porVencer = av.length - vencidos;
+  const T = ({ largo, corto }: { largo: string; corto: string }) => <><span className="t-largo">{largo}</span><span className="t-corto">{corto}</span></>;
+  return (
+    <li>
+      {/* the whole card opens the bag (stretched button); the service switch sits on top of it */}
+      <div className={`bag ${estado}`}>
+        <span className="bag-main">
+          {conBarrio && b.barrio && <span className="bag-barrio">{b.barrio}</span>}
+          <span className="bag-top">
+            <button className="bag-open bag-name" onClick={() => onOpen(b.id)}>{b.nombre}</button>
+            <span className="bag-side">
+              <ServicioBoton b={b} user={user} toast={toast} />
+              {b.horario && <span className="bag-horario">{b.horario}</span>}
+            </span>
+          </span>
+          {(b.direccion || b.ubicacion) && <span className="bag-where">{[b.direccion, b.ubicacion].filter(Boolean).join(" · ")}</span>}
+          {/* big, readable status: what a dispatcher needs in an emergency */}
+          {fuera && (<>
+            <span className="bag-estado fuera"><span className="bag-estado-icon" aria-hidden="true">⛔</span><T largo="Fuera de servicio" corto="Fuera" /></span>
+            <span className="bag-when">No contar con este bolso{b.servicioDesde ? ` · desde ${hace(b.servicioDesde)}` : ""}{b.servicioPor ? ` · marcado por ${b.servicioPor}` : ""}</span>
+          </>)}
+          {!fuera && <>
+            {!r.cargados && <span className="bag-estado none">Sin cargar</span>}
+            {r.cargados > 0 && r.faltan > 0 && (
+              <span className="bag-estado bad"><span className="bag-estado-icon" aria-hidden="true">✕</span>
+                <T largo={r.faltan === 1 ? "Falta 1 elemento" : `Faltan ${r.faltan} elementos`} corto={`Faltan ${r.faltan}`} /></span>
+            )}
+            {r.cargados > 0 && !r.faltan && !parcial && <span className="bag-estado ok"><span className="bag-estado-icon" aria-hidden="true">✓</span>Completo</span>}
+            {!r.faltan && parcial && <span className="bag-estado warn"><span className="bag-estado-icon" aria-hidden="true">!</span>
+              <T largo={`Revisado ${r.cargados} de ${r.total}`} corto={`${r.cargados}/${r.total}`} /></span>}
+            {r.faltan > 0 && (
+              <ul className="bag-miss">
+                {r.bad.slice(0, 6).map((y) => <li key={y.it.id}><span>{y.it.nombre}</span><span className="bag-miss-motivo">{y.st.motivo}</span></li>)}
+                {r.faltan > 6 && <li className="mas">y {r.faltan - 6} más</li>}
+              </ul>
+            )}
+            <span className="bag-pills">
+              {vencidos > 0 && <span className="pill bad">{vencidos} vencido{vencidos > 1 ? "s" : ""}</span>}
+              {porVencer > 0 && <span className="pill warn">{porVencer} por vencer</span>}
+              {r.atencion > 0 && <span className="pill warn">{r.atencion} atención</span>}
+              {r.faltan > 0 && parcial && <span className="pill warn">Revisado {r.cargados} de {r.total}</span>}
+              {viejo && <span className="pill warn">Sin revisar hace {dias} días</span>}
+            </span>
+            <span className="bag-when">{b.actualizado ? `Revisado ${hace(b.actualizado)}${b.por ? ` por ${b.por}` : ""}` : "Nadie lo revisó todavía"}</span>
+          </>}
+        </span>
+        <span className="chev" aria-hidden="true">›</span>
+      </div>
+    </li>
+  );
+}
+
 /** "En servicio" (green) ⇄ "Fuera de servicio" (red). Any team member can switch it; it is logged. */
 function ServicioBoton({ b, user, toast, grande }: { b: BolsoInst; user: User; toast: (m: string) => void; grande?: boolean }) {
   const [busy, setBusy] = useState(false);
@@ -378,7 +447,7 @@ function ServicioBoton({ b, user, toast, grande }: { b: BolsoInst; user: User; t
         finally { setBusy(false); }
       }}
     >
-      <span className="servicio-dot" aria-hidden="true" />{fuera ? "Fuera de servicio" : "En servicio"}
+      <span className="servicio-dot" aria-hidden="true" /><span className="servicio-txt">{fuera ? "Fuera de servicio" : "En servicio"}</span>
     </button>
   );
 }
