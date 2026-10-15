@@ -6,11 +6,11 @@
 //   solicitudes/{email}            access requests from people who signed in but are not in the team yet
 import {
   doc, collection, onSnapshot, query, orderBy, limit as qLimit, serverTimestamp, writeBatch,
-  setDoc, updateDoc, deleteDoc, deleteField, Timestamp, type Unsubscribe,
+  setDoc, updateDoc, deleteDoc, deleteField, Timestamp, getDocs, type Unsubscribe,
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { fb } from "./firebase";
-import { aplicarLista, copiarLista, emptyBolso, type Bolso, type CambioLista, type Movimiento } from "./inventory";
+import { aplicarLista, copiarLista, emptyBolso, listaComun, type Bolso, type Catalog, type CambioLista, type Movimiento } from "./inventory";
 import type { Store } from "./data";
 
 import { ADMINS } from "./config";
@@ -150,6 +150,14 @@ export function bolsoStore(id: string, user: User): Store {
       await batch.commit();
     },
   };
+}
+
+/** The item list the institution's bags use, for the personal app. null if this person can't see the bags. */
+export async function obtenerListaEquipo(): Promise<Catalog | null> {
+  try {
+    const snap = await getDocs(collection(db(), "bolsos"));
+    return listaComun(snap.docs.map((d) => d.data().catalog as Catalog | undefined).filter((c): c is Catalog => !!c?.secciones));
+  } catch { return null; } // not in the team: no access
 }
 
 /* ---------- One list for every bag ---------- */

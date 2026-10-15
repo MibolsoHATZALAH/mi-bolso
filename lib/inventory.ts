@@ -379,3 +379,24 @@ export function copiarLista(b: Bolso, origen: Bolso): Bolso {
   const vencOk = (id: string) => ids.has(id);
   return { schema: b.schema, catalog, valores: pick(b.valores), cant: pick(b.cant), venc: Object.fromEntries(Object.entries(b.venc).filter(([id]) => vencOk(id))) };
 }
+
+/* ---------- The team's list (institutional bags) for personal bags ---------- */
+const claveLista = (c: Catalog) => JSON.stringify(c);
+export const mismaLista = (a: Catalog, b: Catalog) => claveLista(a) === claveLista(b);
+/** The list most institutional bags use (they normally all share one). Ties: the first one given. */
+export function listaComun(catalogs: Catalog[]): Catalog | null {
+  const n = new Map<string, { c: Catalog; n: number }>();
+  for (const c of catalogs) { const k = claveLista(c); const x = n.get(k); if (x) x.n++; else n.set(k, { c, n: 1 }); }
+  let best: { c: Catalog; n: number } | null = null;
+  for (const x of n.values()) if (!best || x.n > best.n) best = x;
+  return best ? (JSON.parse(JSON.stringify(best.c)) as Catalog) : null;
+}
+/** What copying `nueva` onto bag `b` adds and removes (item names), to show before doing it. */
+export function difLista(b: Bolso, nueva: Catalog) {
+  const ids = (c: Catalog) => new Map(c.secciones.flatMap((s) => s.categorias.flatMap((x) => x.items.map((it) => [it.id, it.nombre] as const))));
+  const antes = ids(b.catalog), despues = ids(nueva);
+  const nuevos = [...despues].filter(([id]) => !antes.has(id)).map(([, n]) => n);
+  const quitados = [...antes].filter(([id]) => !despues.has(id)).map(([, n]) => n);
+  const conDatos = [...antes].filter(([id]) => !despues.has(id) && (b.valores[id] != null || b.cant[id] != null || b.venc[id] != null)).map(([, n]) => n);
+  return { nuevos, quitados, conDatos };
+}

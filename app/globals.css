@@ -533,3 +533,12 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 .bags.cuatro .bag-miss.leve li.leve-head{font-size:10.5px;padding-top:6px;letter-spacing:0}
 .bags.dos .bag-miss.leve li.leve-head{font-size:12px}
 .edit-row .vital-toggle{color:var(--bad);font-weight:600}
+
+/* ---------- Personal bag: offer the institution's list ---------- */
+.lista-equipo{margin-top:16px;background:var(--glass);border:.5px solid var(--glass-edge);border-radius:var(--r-card);padding:14px 16px;display:flex;flex-direction:column;gap:10px;
+  box-shadow:inset 0 1px 0 var(--glass-shine);-webkit-backdrop-filter:blur(20px) saturate(1.6);backdrop-filter:blur(20px) saturate(1.6)}
+.lista-equipo-txt{display:flex;flex-direction:column;gap:2px;font-size:15px}
+.lista-equipo-txt span{color:var(--muted);font-size:14px}
+.lista-equipo-dif{font-size:14px;max-height:220px;overflow:auto}
+.lista-equipo-dif p{margin:4px 0}
+.lista-equipo-btns{display:flex;gap:8px;flex-wrap:wrap}

@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   TIPOS, addItem, applySheet, buildCopyText, fmtWhen, groupBySection, mergeCambio, parseLegacyBackup,
-  aplicarLista, esVital, rows, setCant, setValue, setVenc,
-  type Bolso, type Cambio, type CambioLista, type Draft, type Movimiento, type Tipo,
+  aplicarLista, copiarLista, difLista, esVital, mismaLista, rows, setCant, setValue, setVenc,
+  type Bolso, type Catalog, type Cambio, type CambioLista, type Draft, type Movimiento, type Tipo,
 } from "@/lib/inventory";
 import type { MovIn, Store } from "@/lib/data";
 import { Options, Stepper } from "./Controls";
@@ -37,12 +37,16 @@ type Props = {
   editNote?: string;
   /** Extra row at the bottom of the status band (push alarms). */
   bandExtra?: ReactNode;
+  /** Personal bag: the institution's list, offered when this bag's list is different. */
+  listaEquipo?: Catalog | null;
 };
 
 export default function InventoryApp({
   store, title, top, back, subtitle, canEditList = true, editExtra, copyTitle,
-  savedText = "Guardado en tu cuenta", loadingText = "Cargando tu bolso…", tabKey = "mibolso-tab", bandExtra, onListaChange, editNote,
+  savedText = "Guardado en tu cuenta", loadingText = "Cargando tu bolso…", tabKey = "mibolso-tab", bandExtra, onListaChange, editNote, listaEquipo,
 }: Props) {
+  const [verLista, setVerLista] = useState(false);
+  const [listaOculta, setListaOculta] = useState("");
   const [bolso, setBolso] = useState<Bolso | null>(null);
   const [movs, setMovs] = useState<Movimiento[]>([]);
   const [movLimit, setMovLimit] = useState(PAGE);
@@ -65,7 +69,7 @@ export default function InventoryApp({
   useEffect(() => { setBolso(null); setLoadError(""); return store.subscribe(setBolso, (e) => setLoadError(e.message)); }, [store]);
   useEffect(() => store.subscribeMovs(movLimit, setMovs, () => {}), [store, movLimit]);
   useEffect(() => {
-    try { const t = localStorage.getItem(tabKey); if (t) setTab(t); } catch {}
+    try { const t = localStorage.getItem(tabKey); if (t) setTab(t); setListaOculta(localStorage.getItem(`${tabKey}-lista-oculta`) ?? ""); } catch {}
     const upd = () => setOnline(navigator.onLine); upd();
     window.addEventListener("online", upd); window.addEventListener("offline", upd);
     return () => { window.removeEventListener("online", upd); window.removeEventListener("offline", upd); };
@@ -160,6 +164,32 @@ export default function InventoryApp({
         </header>
 
         <AlarmaVenc bolso={bolso} clave={`${tabKey}-${title}`} />
+
+        {listaEquipo && !mismaLista(bolso.catalog, listaEquipo) && listaOculta !== JSON.stringify(listaEquipo).length + "" && (() => {
+          const dif = difLista(bolso, listaEquipo);
+          const usar = () => {
+            persist(copiarLista(bolso, { ...bolso, catalog: listaEquipo }), { tipo: "ajuste", nota: "Lista copiada de los bolsos de la institución", cambios: [] });
+            setVerLista(false); toast("Lista actualizada");
+          };
+          return (
+            <section className="lista-equipo">
+              <div className="lista-equipo-txt"><b>Lista de los bolsos de la institución</b>
+                <span>Tu lista es distinta{dif.nuevos.length ? ` · ${dif.nuevos.length} elemento${dif.nuevos.length > 1 ? "s" : ""} nuevo${dif.nuevos.length > 1 ? "s" : ""}` : ""}{dif.quitados.length ? ` · ${dif.quitados.length} que ellos no tienen` : ""}. Lo que ya cargaste se mantiene.</span></div>
+              {verLista && (dif.nuevos.length > 0 || dif.quitados.length > 0) && (
+                <div className="lista-equipo-dif">
+                  {dif.nuevos.length > 0 && <p><b>Se agregan:</b> {dif.nuevos.join(", ")}</p>}
+                  {dif.quitados.length > 0 && <p><b>Se quitan:</b> {dif.quitados.join(", ")}</p>}
+                </div>
+              )}
+              <div className="lista-equipo-btns">
+                {verLista
+                  ? <><button className="btn primary" id="usar-lista" onClick={usar}>Usar esta lista</button><button className="btn" onClick={() => setVerLista(false)}>Cancelar</button></>
+                  : <><button className="btn primary" id="ver-lista" onClick={() => setVerLista(true)}>Ver y actualizar</button>
+                    <button className="btn" onClick={() => { const k = JSON.stringify(listaEquipo).length + ""; setListaOculta(k); try { localStorage.setItem(`${tabKey}-lista-oculta`, k); } catch {} }}>Ahora no</button></>}
+              </div>
+            </section>
+          );
+        })()}
 
         {cargados === 0 && <p className="notice">Primera vez: recorré cada compartimento y cargá lo que tenés. Después sólo usás “Registrar uso” y “Reponer”.</p>}
 

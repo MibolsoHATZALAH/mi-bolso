@@ -154,3 +154,20 @@ test("restocking text leaves out-of-service bags apart", async () => {
   assert.doesNotMatch(t, /\*Auto 2\*/);
   assert.match(t, /Fuera de servicio: Auto 2/);
 });
+
+test("team list: the list most bags use, and what copying it changes in a personal bag", async () => {
+  const { listaComun, difLista, mismaLista, copiarLista } = await import("../lib/inventory.ts");
+  const a = emptyBolso().catalog, b = emptyBolso().catalog;
+  b.secciones[0].categorias.push({ id: "hem", nombre: "Hemorragias", items: [{ id: "h1", nombre: "Venda israelí", tipo: "sn" }] });
+  const comun = listaComun([a, b, JSON.parse(JSON.stringify(b))])!;
+  assert.ok(mismaLista(comun, b));
+  let p = setValue(emptyBolso(), "ft4", "SI")!.next;
+  p = { ...p, catalog: { secciones: p.catalog.secciones.map((s, i) => i ? s : { ...s, categorias: [...s.categorias, { id: "mia", nombre: "Mías", items: [{ id: "m1", nombre: "Linterna frontal", tipo: "sn" }] }] }) } };
+  p = setValue(p, "m1", "SI")!.next;
+  assert.deepEqual(difLista(p, comun), { nuevos: ["Venda israelí"], quitados: ["Linterna frontal"], conDatos: ["Linterna frontal"] });
+  const n = copiarLista(p, { ...p, catalog: comun });
+  assert.ok(mismaLista(n.catalog, comun));
+  assert.equal(n.valores.ft4, "SI");
+  assert.equal(n.valores.m1, undefined);
+  assert.equal(listaComun([]), null);
+});

@@ -1,0 +1,36 @@
+# Copies the institutional bags' item list to personal Mi Bolso bags. Actions → "Lista a Mi Bolso" → Run workflow.
+name: Lista a Mi Bolso
+
+on:
+  workflow_dispatch:
+    inputs:
+      emails:
+        description: "Cuentas de Mi Bolso (emails separados por coma)"
+        type: string
+        default: "urielchirazi@gmail.com"
+      prueba:
+        description: "Sólo mostrar, sin guardar"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency: lista-personal
+
+jobs:
+  copiar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Copiar lista
+        run: node --experimental-strip-types scripts/lista-personal.ts "$EMAILS" ${{ !inputs.prueba && '--guardar' || '' }}
+        env:
+          EMAILS: ${{ inputs.emails }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
