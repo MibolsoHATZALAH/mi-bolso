@@ -497,3 +497,24 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 .wrap.ancho{max-width:none;padding-inline:max(10px,env(safe-area-inset-left,0px)) max(10px,env(safe-area-inset-right,0px))}
 .wrap.ancho .band{margin:0 -10px;padding-inline:10px}
 .wrap.ancho .chips{margin:0 -10px;padding-inline:10px}
+
+/* ---------- address → Google Maps, cross streets, live availability ---------- */
+.maps{position:relative;z-index:1;color:var(--accent);text-decoration:none;font-weight:600;align-self:flex-start;border-radius:6px}
+.maps:hover{text-decoration:underline}
+.maps.bag-where{color:var(--accent)}
+.entrecalles{font-size:14px;color:var(--ink);opacity:.8;line-height:1.25}
+.titles .subtitle{display:flex;flex-direction:column;gap:3px}
+.disp{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font-size:13px;font-weight:600;line-height:1.2}
+.disp-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 auto}
+.disp.abierto{color:var(--ok)}
+.disp.cerrado{color:var(--muted)}
+/* closed right now: grey card at the bottom, the banner says why */
+.bag.cerrado{filter:grayscale(1);--tint:transparent;background:color-mix(in srgb,var(--glass) 70%,var(--fill))}
+.bag.cerrado .bag-name{color:var(--muted)}
+.bag-cerrado{align-self:stretch;background:var(--fill-2);color:var(--ink);border-radius:12px;padding:7px 10px;font-size:14px;line-height:1.3}
+.bag-cerrado b{font-weight:800}
+.cerrados .barrio-head span:first-child{color:var(--muted)}
+.bags.cuatro .entrecalles{font-size:11px}
+.bags.cuatro .disp{font-size:11px}
+.bags.cuatro .bag-cerrado{font-size:11px;padding:5px 7px}
+@media (min-width:900px){ .bags.cuatro .entrecalles{font-size:13px} .bags.cuatro .disp{font-size:13px} .bags.cuatro .bag-cerrado{font-size:13px} }

@@ -21,12 +21,12 @@ export type Acceso = { estado: "cargando" } | { estado: "pendiente" } | { estado
 export type Miembro = { email: string; rol: Rol; nombre: string };
 export type Solicitud = { email: string; nombre: string; foto: string; t: Date };
 export type BolsoInst = {
-  id: string; nombre: string; ubicacion: string; direccion: string; barrio: string; horario: string;
+  id: string; nombre: string; ubicacion: string; direccion: string; entrecalles: string; barrio: string; horario: string;
   bolso: Bolso; actualizado: Date | null; por: string;
   /** Out of service: the team can't count on this bag (closed, taken away, broken…). */
   fueraDeServicio: boolean; servicioPor: string; servicioDesde: Date | null;
 };
-export type DatosBolso = { nombre: string; ubicacion: string; direccion: string; barrio: string; horario: string };
+export type DatosBolso = { nombre: string; ubicacion: string; direccion: string; entrecalles: string; barrio: string; horario: string };
 
 export const emailDe = (u: User) => (u.email ?? "").trim().toLowerCase();
 export const esAdmin = (u: User) => ADMINS.includes(emailDe(u));
@@ -94,7 +94,7 @@ export function subscribeBolsos(next: (b: BolsoInst[]) => void, onError: (e: Err
   return onSnapshot(collection(db(), "bolsos"), (snap) => {
     next(snap.docs.map((d) => {
       const x = d.data({ serverTimestamps: "estimate" });
-      return { id: d.id, nombre: x.nombre ?? "Bolso", ubicacion: x.ubicacion ?? "", direccion: x.direccion ?? "", barrio: x.barrio ?? "", horario: x.horario ?? "",
+      return { id: d.id, nombre: x.nombre ?? "Bolso", ubicacion: x.ubicacion ?? "", direccion: x.direccion ?? "", entrecalles: x.entrecalles ?? "", barrio: x.barrio ?? "", horario: x.horario ?? "",
         bolso: toBolso(x),
         fueraDeServicio: x.fueraDeServicio === true, servicioPor: x.servicioCambio?.nombre ?? "",
         servicioDesde: (x.servicioCambio?.t as Timestamp)?.toDate?.() ?? null,
@@ -102,7 +102,7 @@ export function subscribeBolsos(next: (b: BolsoInst[]) => void, onError: (e: Err
     }).sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true })));
   }, onError);
 }
-const limpio = (d: DatosBolso) => ({ nombre: d.nombre.trim(), ubicacion: d.ubicacion.trim(), direccion: d.direccion.trim(), barrio: d.barrio.trim(), horario: d.horario.trim() });
+const limpio = (d: DatosBolso) => ({ nombre: d.nombre.trim(), ubicacion: d.ubicacion.trim(), direccion: d.direccion.trim(), entrecalles: d.entrecalles.trim(), barrio: d.barrio.trim(), horario: d.horario.trim() });
 export async function crearBolso(datos: DatosBolso, copiarDe?: Bolso) {
   const ref = doc(collection(db(), "bolsos"));
   const base = emptyBolso();
@@ -201,4 +201,15 @@ export async function cambiarServicio(id: string, fuera: boolean, user: User) {
   batch.update(bolsoRef(id), { fueraDeServicio: fuera, servicioCambio: { ...por, t: serverTimestamp() } });
   batch.set(doc(movsCol(id)), { tipo: "servicio", nota: fuera ? "Marcado fuera de servicio" : "De nuevo en servicio", cambios: [], t: serverTimestamp(), por });
   await batch.commit();
+}
+
+/** Google Maps link for a bag's address (City addresses get "CABA" so they never land in another town). */
+export function linkMaps(b: { nombre: string; direccion: string; barrio: string }) {
+  const dir = b.direccion.trim();
+  const tieneNumero = /\d/.test(dir);
+  const enCiudad = b.barrio.trim().toLowerCase() !== "otros";
+  const q = !dir ? b.nombre
+    : tieneNumero ? `${dir.replace(/\s*(piso|dpto|depto|\d+\s*[a-z]$).*$/i, "")}, ${enCiudad ? "Ciudad Autónoma de Buenos Aires" : "Buenos Aires"}, Argentina`
+    : `${b.nombre}, ${dir}, Buenos Aires, Argentina`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 }

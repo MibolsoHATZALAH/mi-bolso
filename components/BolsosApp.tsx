@@ -4,7 +4,7 @@ import { signOut, type User } from "firebase/auth";
 import { fb } from "@/lib/firebase";
 import { alertasVenc, buildCopyTextVarios, resumen, type Bolso, type CambioLista } from "@/lib/inventory";
 import {
-  ADMINS, agregarMiembro, aplicarListaEnOtros, aprobar, bolsoStore, cambiarServicio, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
+  ADMINS, agregarMiembro, aplicarListaEnOtros, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
   quitarMiembro, rechazar, subscribeAcceso, subscribeBolsos, subscribeEquipo, subscribeSolicitudes,
   type Acceso, type BolsoInst, type DatosBolso, type Miembro, type Rol, type Solicitud,
 } from "@/lib/bolsos";
@@ -12,6 +12,7 @@ import InventoryApp from "./InventoryApp";
 import { UserChip } from "./Login";
 import AlarmasPush from "./AlarmasPush";
 import { BARRIOS } from "@/lib/config";
+import { disponibilidad, leerHorario, textoDisponibilidad, type Disponibilidad } from "@/lib/horario";
 
 const STALE_DAYS = 30; // a bag nobody has checked in this long gets flagged
 type Vista = { k: "lista" } | { k: "bolso"; id: string } | { k: "equipo" };
@@ -119,7 +120,7 @@ function BolsoView({ b, bolsos, user, gerencia, chip, onBack, toast }: {
   b: BolsoInst; bolsos: BolsoInst[]; user: User; gerencia: boolean; chip: React.ReactNode; onBack: () => void; toast: (m: string) => void;
 }) {
   const store = useMemo(() => bolsoStore(b.id, user), [b.id, user]);
-  const datosDe = (x: BolsoInst): DatosBolso => ({ nombre: x.nombre, ubicacion: x.ubicacion, direccion: x.direccion, barrio: x.barrio, horario: x.horario });
+  const datosDe = (x: BolsoInst): DatosBolso => ({ nombre: x.nombre, ubicacion: x.ubicacion, direccion: x.direccion, entrecalles: x.entrecalles, barrio: x.barrio, horario: x.horario });
   const [datos, setDatos] = useState<DatosBolso>(datosDe(b));
   const [borrar, setBorrar] = useState(false);
   const [igualar, setIgualar] = useState(false);
@@ -133,7 +134,7 @@ function BolsoView({ b, bolsos, user, gerencia, chip, onBack, toast }: {
       .catch(() => toast("No se pudo actualizar la lista en los otros bolsos"));
   }, [b.id, toast]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setDatos(datosDe(b)); }, [b.nombre, b.ubicacion, b.direccion, b.barrio, b.horario]);
+  useEffect(() => { setDatos(datosDe(b)); }, [b.nombre, b.ubicacion, b.direccion, b.entrecalles, b.barrio, b.horario]);
 
   const guardarDatos = (d: DatosBolso = datos) => {
     if (!d.nombre.trim()) { setDatos((x) => ({ ...x, nombre: b.nombre })); return; }
@@ -172,7 +173,13 @@ function BolsoView({ b, bolsos, user, gerencia, chip, onBack, toast }: {
 
   return (
     <InventoryApp
-      store={store} title={b.nombre} subtitle={[b.direccion, b.ubicacion, b.horario && `Horario: ${b.horario}`].filter(Boolean).join(" · ")} top={chip}
+      store={store} title={b.nombre} top={chip}
+      subtitle={<>
+        {b.direccion && <a className="maps" href={linkMaps(b)} target="_blank" rel="noopener noreferrer">📍 {b.direccion}</a>}
+        {b.entrecalles && <span className="entrecalles">{b.entrecalles}</span>}
+        {[b.ubicacion, b.horario && `Horario: ${b.horario}`].filter(Boolean).join(" · ")}
+        <Disponible d={disponibilidad(leerHorario(b.horario))} />
+      </>}
       back={{ label: "Todos los bolsos", onClick: onBack }}
       canEditList={gerencia} editExtra={editExtra} copyTitle={b.nombre}
       onListaChange={gerencia && otros > 0 ? onListaChange : undefined}
@@ -199,7 +206,11 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
 }) {
   const [nuevo, setNuevo] = useState(false);
   const [copyFallback, setCopyFallback] = useState("");
-  const datos: Dato[] = useMemo(() => bolsos.map((b) => ({ b, r: resumen(b.bolso), av: alertasVenc(b.bolso) })), [bolsos]);
+  // the clock: availability is recomputed every 30 s
+  const [ahora, setAhora] = useState(() => new Date());
+  useEffect(() => { const t = setInterval(() => setAhora(new Date()), 30_000); return () => clearInterval(t); }, []);
+  const base = useMemo(() => bolsos.map((b) => ({ b, r: resumen(b.bolso), av: alertasVenc(b.bolso), h: leerHorario(b.horario) })), [bolsos]);
+  const datos: Dato[] = useMemo(() => base.map(({ h, ...x }) => ({ ...x, disp: disponibilidad(h, ahora) })), [base, ahora]);
   const barrioDe = (x: Dato) => x.b.barrio.trim() || "Sin barrio";
   const rank = (k: string) => { const i = BARRIOS.findIndex((x) => x.toLowerCase() === k.toLowerCase()); return k === "Sin barrio" ? 1e4 : i < 0 ? 1e3 : i; };
   const todosLosBarrios = useMemo(() => [...new Set(datos.map(barrioDe))].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, "es")), [datos]);
@@ -231,13 +242,16 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
   }, [datos, barrioActivo, q]);
 
   // out of service or incomplete → on top, once (taken out of their neighborhood)
-  const necesitaAtencion = (x: Dato) => x.b.fueraDeServicio || (x.r.cargados > 0 && x.r.faltan > 0);
+  const cerradoAhora = (x: Dato) => !x.b.fueraDeServicio && x.disp.estado === "cerrado";
+  const necesitaAtencion = (x: Dato) => x.b.fueraDeServicio || (!cerradoAhora(x) && x.r.cargados > 0 && x.r.faltan > 0);
+  const cerrados = useMemo(() => visibles.filter(cerradoAhora)
+    .sort((a, b) => rank(barrioDe(a)) - rank(barrioDe(b)) || a.b.nombre.localeCompare(b.b.nombre, "es")), [visibles]);
   const atencion = useMemo(() => visibles.filter(necesitaAtencion)
     .sort((a, b) => Number(b.b.fueraDeServicio) - Number(a.b.fueraDeServicio) || b.r.faltan - a.r.faltan || a.b.nombre.localeCompare(b.b.nombre, "es")), [visibles]);
   // grouped by neighborhood, in the spreadsheet's order; unknown ones after, bags without one last
   const grupos = useMemo(() => {
     const m = new Map<string, Dato[]>();
-    for (const x of visibles) { if (necesitaAtencion(x)) continue; const k = barrioDe(x); if (!m.has(k)) m.set(k, []); m.get(k)!.push(x); }
+    for (const x of visibles) { if (necesitaAtencion(x) || cerradoAhora(x)) continue; const k = barrioDe(x); if (!m.has(k)) m.set(k, []); m.get(k)!.push(x); }
     return [...m.entries()].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b, "es")).map(([barrio, items]) => ({ barrio, items }));
   }, [visibles]);
   const filtrando = !!barrioActivo || !!q.trim();
@@ -329,16 +343,24 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
 
       {grupos.map((g) => (
         <section className="barrio" key={g.barrio}>
-          {(grupos.length > 1 || atencion.length > 0) && <h2 className="barrio-head"><span>{g.barrio}</span><span className="barrio-n">{g.items.length}</span></h2>}
+          {(grupos.length > 1 || atencion.length > 0 || cerrados.length > 0) && <h2 className="barrio-head"><span>{g.barrio}</span><span className="barrio-n">{g.items.length}</span></h2>}
           <ul className={`bags ${claseCols}`}>{g.items.map((x) => card(x))}</ul>
         </section>
       ))}
+
+      {cerrados.length > 0 && (
+        <section className="barrio cerrados">
+          <h2 className="barrio-head"><span>No disponibles en este horario</span><span className="barrio-n">{cerrados.length}</span></h2>
+          <p className="atencion-nota">Según el horario de cada lugar. Vuelven solos arriba cuando abren.</p>
+          <ul className={`bags ${claseCols}`}>{cerrados.map((x) => card(x, true))}</ul>
+        </section>
+      )}
     </div>
   );
 }
 
 function NuevoBolso({ bolsos, onDone, toast }: { bolsos: BolsoInst[]; onDone: (id: string) => void; toast: (m: string) => void }) {
-  const [datos, setDatos] = useState<DatosBolso>({ nombre: "", ubicacion: "", direccion: "", barrio: "", horario: "" });
+  const [datos, setDatos] = useState<DatosBolso>({ nombre: "", ubicacion: "", direccion: "", entrecalles: "", barrio: "", horario: "" });
   // new bags start with the list the other bags use (most recently checked bag)
   const ultimo = [...bolsos].sort((a, b) => (b.actualizado?.getTime() ?? 0) - (a.actualizado?.getTime() ?? 0))[0];
   const [base, setBase] = useState(ultimo?.id ?? "");
@@ -367,14 +389,15 @@ function NuevoBolso({ bolsos, onDone, toast }: { bolsos: BolsoInst[]; onDone: (i
   );
 }
 
-type Dato = { b: BolsoInst; r: ReturnType<typeof resumen>; av: ReturnType<typeof alertasVenc> };
+type Dato = { b: BolsoInst; r: ReturnType<typeof resumen>; av: ReturnType<typeof alertasVenc>; disp: Disponibilidad };
 const normalizar = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 /** What people type for a neighborhood (speech-to-text writes "Once" as "11"). */
 const SINONIMOS: Record<string, string[]> = { "11": ["once"], "once": ["11"], "v crespo": ["villa crespo"], "chaca": ["chacarita"] };
 
 /** One bag in the list. In 4-per-row mode the CSS shows only name, status and the service dot. */
 function BagCard({ x, user, toast, onOpen, conBarrio }: { x: Dato; user: User; toast: (m: string) => void; onOpen: (id: string) => void; conBarrio?: boolean }) {
-  const { b, r, av } = x;
+  const { b, r, av, disp } = x;
+  const cerrado = !b.fueraDeServicio && disp.estado === "cerrado";
   const dias = diasDesde(b.actualizado);
   const viejo = r.cargados > 0 && dias !== null && dias >= STALE_DAYS;
   const parcial = r.cargados > 0 && r.cargados < r.total;
@@ -385,7 +408,7 @@ function BagCard({ x, user, toast, onOpen, conBarrio }: { x: Dato; user: User; t
   return (
     <li>
       {/* the whole card opens the bag (stretched button); the service switch sits on top of it */}
-      <div className={`bag ${estado}`}>
+      <div className={`bag ${estado} ${cerrado ? "cerrado" : ""}`}>
         <span className="bag-main">
           {conBarrio && b.barrio && <span className="bag-barrio">{b.barrio}</span>}
           <span className="bag-top">
@@ -395,7 +418,11 @@ function BagCard({ x, user, toast, onOpen, conBarrio }: { x: Dato; user: User; t
               {b.horario && <span className="bag-horario">{b.horario}</span>}
             </span>
           </span>
-          {(b.direccion || b.ubicacion) && <span className="bag-where">{[b.direccion, b.ubicacion].filter(Boolean).join(" · ")}</span>}
+          {cerrado && <span className="bag-cerrado"><b>No disponible en este horario</b>{textoDisponibilidad(disp) && <> · {textoDisponibilidad(disp)}</>}</span>}
+          {!cerrado && !b.fueraDeServicio && <Disponible d={disp} />}
+          {b.direccion && <a className="maps bag-where" href={linkMaps(b)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>📍 {b.direccion}</a>}
+          {b.entrecalles && <span className="entrecalles">{b.entrecalles}</span>}
+          {b.ubicacion && <span className="bag-where">{b.ubicacion}</span>}
           {/* big, readable status: what a dispatcher needs in an emergency */}
           {fuera && (<>
             <span className="bag-estado fuera"><span className="bag-estado-icon" aria-hidden="true">⛔</span><T largo="Fuera de servicio" corto="Fuera" /></span>
@@ -430,6 +457,12 @@ function BagCard({ x, user, toast, onOpen, conBarrio }: { x: Dato; user: User; t
       </div>
     </li>
   );
+}
+
+/** Small "available now · until 22:00" line; nothing when the schedule is unknown. */
+function Disponible({ d }: { d: Disponibilidad }) {
+  if (d.estado === "desconocido") return null;
+  return <span className={`disp ${d.estado}`}><span className="disp-dot" aria-hidden="true" />{d.estado === "cerrado" ? `No disponible en este horario · ${textoDisponibilidad(d)}` : textoDisponibilidad(d)}</span>;
 }
 
 /** "En servicio" (green) ⇄ "Fuera de servicio" (red). Any team member can switch it; it is logged. */
@@ -467,6 +500,7 @@ function CamposBolso({ id, datos, bolsos, onChange, onCommit }: {
         <datalist id={`${id}-barrios`}>{barrios.map((x) => <option key={x} value={x} />)}</datalist>
       </label>
       <label htmlFor={`${id}-dir`}>Dirección<input id={`${id}-dir`} value={datos.direccion} placeholder="Ej.: Agüero 1164" onChange={set("direccion")} onBlur={blur} /></label>
+      <label htmlFor={`${id}-entre`}>Entrecalles<input id={`${id}-entre`} value={datos.entrecalles} placeholder="Ej.: entre Av. Córdoba y Paraguay" onChange={set("entrecalles")} onBlur={blur} /></label>
       <label htmlFor={`${id}-ubic`}>Dónde está adentro<input id={`${id}-ubic`} value={datos.ubicacion} placeholder="Ej.: Recepción, planta baja" onChange={set("ubicacion")} onBlur={blur} /></label>
       <label htmlFor={`${id}-horario`}>Horario<input id={`${id}-horario`} value={datos.horario} placeholder="Ej.: L a V de 9 a 17 · 24 hs" onChange={set("horario")} onBlur={blur} /></label>
     </div>

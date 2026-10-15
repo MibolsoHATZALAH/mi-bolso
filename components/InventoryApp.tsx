@@ -22,7 +22,7 @@ type Props = {
   top: ReactNode;
   /** Shown above the title, e.g. a link back to the list of bags. */
   back?: { label: string; onClick: () => void };
-  subtitle?: string;
+  subtitle?: ReactNode;
   /** Whether "Editar lista" is offered (shared bags: management only). */
   canEditList?: boolean;
   /** Extra controls at the top of the list while editing (bag name, delete…). */
