@@ -2,7 +2,8 @@
 // No Firebase or React here, so it can be unit-tested with plain Node.
 
 export type Tipo = "sn" | "cant" | "nivel";
-export type Item = { id: string; nombre: string; tipo: Tipo; min?: number };
+/** vital: missing shows red (alert); otherwise yellow. Unset = decided by name (see esVital). */
+export type Item = { id: string; nombre: string; tipo: Tipo; min?: number; vital?: boolean };
 export type Categoria = { id: string; nombre: string; vence?: boolean; items: Item[] };
 export type Seccion = { id: string; nombre: string; categorias: Categoria[] };
 export type Catalog = { secciones: Seccion[] };
@@ -28,7 +29,8 @@ export type TipoMov = "uso" | "repo" | "ajuste" | "servicio";
 export type Movimiento = { id: string; t: Date; tipo: TipoMov; nota: string; cambios: Cambio[]; por?: string };
 
 export type Level = "bad" | "warn" | "ok" | "none";
-export type Status = { level: Level; motivo: string };
+/** falta: the item is missing (not just expiring). A missing non-vital item is "warn" (yellow). */
+export type Status = { level: Level; motivo: string; falta?: boolean };
 export type Row = { s: Seccion; c: Categoria; it: Item; st: Status };
 
 export const SCHEMA = 3;
@@ -96,22 +98,35 @@ export const fmtDay = (ymd?: string | null) => { if (!ymd) return ""; const [y, 
 export const fmtDate = (d: Date) => d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
 export const fmtWhen = (d: Date) => d.toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
 
+/* ---------- Vital items ---------- */
+// The team's list: whole categories (signos vitales, vía aérea, oxígeno, hemorragias) plus some single items.
+const CAT_VITAL = /signos vitales|via aerea|oxigeno|he?r?morrag/;
+const ITEM_VITAL = /torniquete|\b(asa|aas)\b|aspirin|glucogel|burn ?free|guantes|lanceta|tiras reactivas/;
+const sinAcentos = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+/** Whether a missing item is shown in red. "Editar lista" can override it per item. */
+export function esVital(it: Item, c: Categoria): boolean {
+  if (typeof it.vital === "boolean") return it.vital;
+  return CAT_VITAL.test(sinAcentos(c.nombre)) || ITEM_VITAL.test(sinAcentos(it.nombre));
+}
+
 /* ---------- Status ---------- */
 export function statusOf(b: Bolso, it: Item, c: Categoria, now = new Date()): Status {
   const dd = c.vence ? daysTo(b.venc[it.id], now) : null;
+  // missing: red when vital, yellow otherwise
+  const falta = (motivo: string): Status => ({ level: esVital(it, c) ? "bad" : "warn", motivo, falta: true });
   if (it.tipo === "cant") {
     const n = b.cant[it.id];
     if (n == null) return { level: "none", motivo: "Sin cargar" };
     const min = it.min ?? 0;
-    if (n === 0) return { level: "bad", motivo: "Sin stock" };
-    if (min && n < min) return { level: "bad", motivo: `Faltan ${min - n}` };
+    if (n === 0) return falta("Sin stock");
+    if (min && n < min) return falta(`Faltan ${min - n}`);
     if (dd !== null && dd < 0) return { level: "bad", motivo: "Vencido" };
     if (dd !== null && dd <= WARN_DAYS) return { level: "warn", motivo: dd === 0 ? "Vence hoy" : `Vence en ${dd} d` };
     return { level: "ok", motivo: "" };
   }
   const v = b.valores[it.id] ?? null;
-  if (v === "NO") return { level: "bad", motivo: "Falta" };
-  if (v === "BAJO") return { level: "bad", motivo: "Carga baja" };
+  if (v === "NO") return falta("Falta");
+  if (v === "BAJO") return falta("Carga baja");
   // a loaded expiry date counts even if SÍ wasn't tapped yet (same rule as the expiry alarm)
   if (dd !== null && dd < 0) return { level: "bad", motivo: "Vencido" };
   if (v === "MEDIO") return { level: "warn", motivo: "Carga media" };
@@ -214,6 +229,10 @@ export function setMin(b: Bolso, id: string, min: number | null) {
   if (!min) delete f.it.min; else f.it.min = Math.max(0, Math.round(min));
   return next;
 }
+export function setVital(b: Bolso, id: string, vital: boolean) {
+  const next = clone(b), f = findItem(next, id); if (!f) return b;
+  f.it.vital = vital; return next;
+}
 export function addItem(b: Bolso, catId: string, nombre: string, newId: string) {
   const next = clone(b);
   for (const s of next.catalog.secciones) for (const c of s.categorias) if (c.id === catId && nombre.trim()) c.items.push({ id: newId, nombre: nombre.trim(), tipo: "sn" });
@@ -227,17 +246,18 @@ export function removeItem(b: Bolso, id: string) {
 }
 
 /* ---------- Copy text for restocking ---------- */
+const faltanN = (b: Bolso, x: Row) => x.it.tipo === "cant" && x.it.min && x.st.motivo.startsWith("Faltan") ? ` – faltan ${Math.max(0, x.it.min - (b.cant[x.it.id] ?? 0))}` : x.st.motivo !== "Falta" ? ` (${x.st.motivo.toLowerCase()})` : "";
 export function buildCopyText(b: Bolso, now = new Date(), titulo = "Bolso paramédico") {
   const all = rows(b, now);
-  const bad = all.filter((x) => x.st.level === "bad"), warn = all.filter((x) => x.st.level === "warn");
+  const bad = all.filter((x) => x.st.level === "bad"), leves = all.filter((x) => x.st.level === "warn" && x.st.falta), warn = all.filter((x) => x.st.level === "warn" && !x.st.falta);
   let t = `${titulo} – reposición al ${fmtDate(now)}\n`;
   for (const g of groupBySection(bad)) {
     t += `\n${g.s.nombre.toUpperCase()}\n`;
     for (const x of g.items) {
-      const extra = x.it.tipo === "cant" && x.it.min ? ` – faltan ${Math.max(0, x.it.min - (b.cant[x.it.id] ?? 0))}` : x.st.motivo !== "Falta" ? ` (${x.st.motivo.toLowerCase()})` : "";
-      t += `• ${x.it.nombre}${extra}\n`;
+      t += `• ${x.it.nombre}${faltanN(b, x)}\n`;
     }
   }
+  if (leves.length) { t += `\nNO VITALES\n`; for (const x of leves) t += `• ${x.it.nombre}${faltanN(b, x)}\n`; }
   if (warn.length) { t += `\nATENCIÓN\n`; for (const x of warn) t += `• ${x.it.nombre} (${x.st.motivo.toLowerCase()})\n`; }
   return t.trim();
 }
@@ -268,11 +288,13 @@ export function parseLegacyBackup(text: string): { bolso: Bolso; historial: Omit
 }
 
 /* ---------- Summary of one bag (for the list of shared bags) ---------- */
-export type Resumen = { faltan: number; atencion: number; cargados: number; total: number; bad: Row[]; warn: Row[] };
+/** bad: red (vital missing, expired); leves: yellow missing (not vital); warn: expiring soon / O₂ half. */
+export type Resumen = { faltan: number; atencion: number; cargados: number; total: number; bad: Row[]; leves: Row[]; warn: Row[] };
 export function resumen(b: Bolso, now = new Date()): Resumen {
   const all = rows(b, now);
-  const bad = all.filter((x) => x.st.level === "bad"), warn = all.filter((x) => x.st.level === "warn");
-  return { faltan: bad.length, atencion: warn.length, cargados: all.filter((x) => x.st.level !== "none").length, total: all.length, bad, warn };
+  const bad = all.filter((x) => x.st.level === "bad");
+  const leves = all.filter((x) => x.st.level === "warn" && x.st.falta), warn = all.filter((x) => x.st.level === "warn" && !x.st.falta);
+  return { faltan: bad.length, atencion: warn.length, cargados: all.filter((x) => x.st.level !== "none").length, total: all.length, bad, leves, warn };
 }
 
 /** One restocking text for several bags (management view). Bags never loaded are listed apart. */
@@ -285,13 +307,11 @@ export function buildCopyTextVarios(bolsos: { nombre: string; ubicacion?: string
     if (x.fueraDeServicio) { fuera.push(x.nombre); continue; }
     const r = resumen(x.bolso, now);
     if (!r.cargados) { sinCargar.push(x.nombre); continue; }
-    if (!r.faltan && !r.atencion) continue;
+    if (!r.faltan && !r.leves.length && !r.atencion) continue;
     algo = true;
     t += `\n*${x.nombre}*${x.ubicacion ? ` (${x.ubicacion})` : ""}\n`;
-    for (const y of r.bad) {
-      const extra = y.it.tipo === "cant" && y.it.min && y.st.motivo.startsWith("Faltan") ? ` – faltan ${Math.max(0, y.it.min - (x.bolso.cant[y.it.id] ?? 0))}` : y.st.motivo !== "Falta" ? ` (${y.st.motivo.toLowerCase()})` : "";
-      t += `• ${y.it.nombre}${extra}\n`;
-    }
+    for (const y of r.bad) t += `• ${y.it.nombre}${faltanN(x.bolso, y)}\n`;
+    if (r.leves.length) t += `No vitales: ${r.leves.map((y) => `${y.it.nombre}${faltanN(x.bolso, y)}`).join(", ")}\n`;
     for (const y of r.warn) t += `• ${y.it.nombre} (${y.st.motivo.toLowerCase()})\n`;
   }
   if (!algo) t += `\nNo falta nada en los bolsos revisados.\n`;
@@ -324,6 +344,7 @@ export type CambioLista =
   | { op: "rename"; id: string; nombre: string }
   | { op: "tipo"; id: string; tipo: Tipo }
   | { op: "min"; id: string; min: number | null }
+  | { op: "vital"; id: string; vital: boolean }
   | { op: "add"; catId: string; id: string; nombre: string }
   | { op: "remove"; id: string };
 
@@ -333,6 +354,7 @@ export function aplicarLista(b: Bolso, ch: CambioLista): Bolso {
     case "rename": return findItem(b, ch.id) ? renameItem(b, ch.id, ch.nombre) : b;
     case "tipo": { const f = findItem(b, ch.id); return f && f.it.tipo !== ch.tipo ? setTipo(b, ch.id, ch.tipo) : b; }
     case "min": return findItem(b, ch.id) ? setMin(b, ch.id, ch.min) : b;
+    case "vital": { const f = findItem(b, ch.id); return f && esVital(f.it, f.c) !== ch.vital ? setVital(b, ch.id, ch.vital) : b; }
     case "remove": return findItem(b, ch.id) ? removeItem(b, ch.id) : b;
     case "add": {
       if (findItem(b, ch.id)) return b;

@@ -16,7 +16,7 @@ test("default catalog has the counted items and minimums", () => {
 test("quantities below the minimum are missing", () => {
   let b = emptyBolso();
   b = setCant(b, "ft7", 3)!.next;
-  assert.deepEqual(st(b, "ft7"), { level: "bad", motivo: "Faltan 1" });
+  assert.deepEqual(st(b, "ft7"), { level: "warn", motivo: "Faltan 1", falta: true }); // gasas: not vital → yellow
   b = setCant(b, "ft7", 4)!.next;
   assert.equal(st(b, "ft7").level, "ok");
 });
@@ -62,9 +62,39 @@ test("resumen counts missing, attention and loaded items of one bag", () => {
   b = setCant(b, "ft7", 2)!.next;          // gasas below 4
   b = setValue(b, "ft4", "SI")!.next;      // torniquete ok
   const r = resumen(b);
-  assert.equal(r.faltan, 1);
+  assert.equal(r.faltan, 0);               // red: vital only
+  assert.equal(r.leves.length, 1);         // yellow: gasas
   assert.equal(r.cargados, 2);
   assert.equal(r.total, 84);
+  b = setValue(b, "ft4", "NO")!.next;      // torniquete missing → red
+  assert.deepEqual([resumen(b).faltan, resumen(b).leves.length], [1, 1]);
+});
+
+test("vital items: the team's categories and single items are red, the rest yellow", async () => {
+  const { esVital, findItem, defaultCatalog } = await import("../lib/inventory.ts");
+  const b = emptyBolso();
+  const v = (id: string) => { const f = findItem(b, id)!; return esVital(f.it, f.c); };
+  // categories: signos vitales (both side pockets), vía aérea, oxígeno
+  for (const id of ["ld1", "ld3", "ls1", "ls8", "pv3", "pv16", "po1", "po11"]) assert.ok(v(id), id);
+  // single items: torniquete, AAS, glucogel, burn free, guantes, lancetas, tiras reactivas
+  for (const id of ["ft4", "fm1", "fm3", "fm7", "lb3", "ls3", "ls2"]) assert.ok(v(id), id);
+  for (const id of ["ft7", "fh1", "fm4", "ph1", "pb1", "pi2", "lb1"]) assert.ok(!v(id), id);
+  // a category the team added later, by name
+  const hem = { id: "h", nombre: "Hemorragias", items: [] };
+  assert.ok(esVital({ id: "x", nombre: "Venda israelí", tipo: "sn" }, hem));
+  assert.ok(esVital({ id: "y", nombre: "ASA", tipo: "sn" }, defaultCatalog().secciones[0].categorias[0]));
+});
+
+test("Editar lista can mark or unmark an item as vital, and it travels to the other bags", async () => {
+  const { aplicarLista } = await import("../lib/inventory.ts");
+  let b = setCant(emptyBolso(), "ft7", 1)!.next;          // gasas below minimum: yellow
+  assert.equal(st(b, "ft7").level, "warn");
+  b = aplicarLista(b, { op: "vital", id: "ft7", vital: true });
+  assert.equal(st(b, "ft7").level, "bad");
+  b = aplicarLista(setValue(b, "ld3", "NO")!.next, { op: "vital", id: "ld3", vital: false });
+  assert.equal(st(b, "ld3").level, "warn");
+  const igual = aplicarLista(b, { op: "vital", id: "ld3", vital: false });
+  assert.equal(igual, b);                                   // no change → same object (nothing to save)
 });
 
 test("restocking text for several bags lists each bag and the unloaded ones", () => {

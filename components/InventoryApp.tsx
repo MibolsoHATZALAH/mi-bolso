@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   TIPOS, addItem, applySheet, buildCopyText, fmtWhen, groupBySection, mergeCambio, parseLegacyBackup,
-  aplicarLista, rows, setCant, setValue, setVenc,
+  aplicarLista, esVital, rows, setCant, setValue, setVenc,
   type Bolso, type Cambio, type CambioLista, type Draft, type Movimiento, type Tipo,
 } from "@/lib/inventory";
 import type { MovIn, Store } from "@/lib/data";
@@ -104,7 +104,9 @@ export default function InventoryApp({
   );
   if (!bolso) return <div className="splash">{loadingText}</div>;
 
-  const bad = all.filter((x) => x.st.level === "bad"), warn = all.filter((x) => x.st.level === "warn");
+  // red: vital missing / expired · yellow: non-vital missing · attention: expiring soon, O₂ half
+  const bad = all.filter((x) => x.st.level === "bad"), leves = all.filter((x) => x.st.level === "warn" && x.st.falta);
+  const warn = all.filter((x) => x.st.level === "warn" && !x.st.falta);
   const cargados = all.filter((x) => x.st.level !== "none").length;
   const seccion = bolso.catalog.secciones.find((s) => s.id === tab);
 
@@ -149,8 +151,8 @@ export default function InventoryApp({
             {top}
           </div>
           <div className="meter">
-            <div className="tile bad"><b className="num">{bad.length}</b><span>Faltan</span></div>
-            <div className="tile warn"><b className="num">{warn.length}</b><span>Atención</span></div>
+            <div className="tile bad"><b className="num">{bad.length}</b><span>Faltan vitales</span></div>
+            <div className="tile warn"><b className="num">{leves.length + warn.length}</b><span>{leves.length ? "Otros faltantes" : "Atención"}</span></div>
             <div className="tile"><b className="num">{cargados}/{all.length}</b><span>Cargados</span></div>
           </div>
           <div className="sync" style={{ marginTop: 6 }}>{online ? savedText : "Sin conexión: se guarda en el celular y se sincroniza al volver la señal"}</div>
@@ -161,15 +163,16 @@ export default function InventoryApp({
 
         {cargados === 0 && <p className="notice">Primera vez: recorré cada compartimento y cargá lo que tenés. Después sólo usás “Registrar uso” y “Reponer”.</p>}
 
-        <section className={`summary ${bad.length ? "" : "clear"}`} aria-live="polite">
+        <section className={`summary ${bad.length ? "" : leves.length ? "leve" : "clear"}`} aria-live="polite">
           <div className="sum-head">
-            <h2>{bad.length ? `Faltantes (${bad.length})` : "Bolso completo"}</h2>
-            <button className="btn" id="copy" disabled={!bad.length && !warn.length} onClick={copy}>Copiar lista para reponer</button>
+            <h2>{bad.length + leves.length ? `Faltantes (${bad.length + leves.length})` : "Bolso completo"}</h2>
+            <button className="btn" id="copy" disabled={!bad.length && !leves.length && !warn.length} onClick={copy}>Copiar lista para reponer</button>
           </div>
-          {!bad.length && !warn.length && <p className="empty-note">No hay nada en falta, vencido ni con carga baja.</p>}
+          {!bad.length && !leves.length && !warn.length && <p className="empty-note">No hay nada en falta, vencido ni con carga baja.</p>}
           {groupBySection(bad).map((g) => (
             <div className="sum-group" key={g.s.id}><h3>{g.s.nombre}</h3><ul className="sum-list">{g.items.map((x) => li(x, "bad"))}</ul></div>
           ))}
+          {!!leves.length && <div className="sum-group leves"><h3>No vitales</h3><ul className="sum-list">{leves.map((x) => li(x, "warn"))}</ul></div>}
           {!!warn.length && <div className="sum-group"><h3>Atención</h3><ul className="sum-list">{warn.map((x) => li(x, "warn"))}</ul></div>}
           {copyFallback && <textarea className="copy-fallback" readOnly value={copyFallback} onFocus={(e) => e.target.select()} />}
         </section>
@@ -177,7 +180,9 @@ export default function InventoryApp({
         <nav className="tabs" role="tablist">
           {bolso.catalog.secciones.map((s) => {
             const n = all.filter((x) => x.s.id === s.id && x.st.level === "bad").length;
-            return <button key={s.id} className="tab" role="tab" aria-selected={tab === s.id} onClick={() => pickTab(s.id)}>{s.nombre}{n > 0 && <span className="cnt">{n}</span>}</button>;
+            const nl = all.filter((x) => x.s.id === s.id && x.st.level === "warn" && x.st.falta).length;
+            return <button key={s.id} className="tab" role="tab" aria-selected={tab === s.id} onClick={() => pickTab(s.id)}>{s.nombre}
+              {n > 0 ? <span className="cnt">{n}</span> : nl > 0 && <span className="cnt warn">{nl}</span>}</button>;
           })}
           <button className="tab" role="tab" aria-selected={tab === "historial"} onClick={() => pickTab("historial")}>Historial</button>
         </nav>
@@ -199,7 +204,7 @@ export default function InventoryApp({
               {editing && editExtra}
               {(seccion ?? bolso.catalog.secciones[0]).categorias.map((c) => {
                 let items = all.filter((x) => x.c.id === c.id);
-                const nb = items.filter((x) => x.st.level === "bad").length;
+                const nb = items.filter((x) => x.st.level === "bad" || x.st.falta).length;
                 if (!editing) {
                   if (filtro === "faltan") items = items.filter((x) => x.st.level === "bad" || x.st.level === "warn");
                   if (filtro === "sin") items = items.filter((x) => x.st.level === "none");
@@ -215,13 +220,14 @@ export default function InventoryApp({
                           <select value={it.tipo} aria-label="Tipo" onChange={(e) => editLista(bolso, { op: "tipo", id: it.id, tipo: e.target.value as Tipo })}>
                             {Object.entries(TIPOS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
                           </select>
+                          <label className="vital-toggle" title="Si falta, se ve en rojo"><input type="checkbox" checked={esVital(it, c)} onChange={(e) => editLista(bolso, { op: "vital", id: it.id, vital: e.target.checked })} /> Vital</label>
                           {it.tipo === "cant" && <label>Mínimo <input type="number" min={0} defaultValue={it.min ?? ""} onBlur={(e) => { const min = e.target.value === "" ? null : Number(e.target.value); if ((min || undefined) !== it.min) editLista(bolso, { op: "min", id: it.id, min }); }} /></label>}
                           {confirmDel === it.id
                             ? <><button className="btn danger" onClick={() => { editLista(bolso, { op: "remove", id: it.id }); setConfirmDel(null); }}>Confirmar</button><button className="btn" onClick={() => setConfirmDel(null)}>No</button></>
                             : <button className="btn danger" onClick={() => setConfirmDel(it.id)}>Quitar</button>}
                         </div></li>
                       ) : (
-                        <li className={`row ${st.level === "bad" ? "is-bad" : ""}`} key={it.id}>
+                        <li className={`row ${st.level === "bad" ? "is-bad" : st.falta ? "is-warn" : ""}`} key={it.id}>
                           <div className="name">
                             <span>{it.nombre}</span>
                             {(it.tipo === "cant" || c.vence || st.level === "bad" || st.level === "warn") && (
@@ -234,8 +240,8 @@ export default function InventoryApp({
                             )}
                           </div>
                           {it.tipo === "cant"
-                            ? <div className="opts"><Stepper id={`q-${it.id}`} value={bolso.cant[it.id]} bad={st.level === "bad"} onChange={(n) => manual(setCant(bolso, it.id, n))} /></div>
-                            : <Options kind={it.tipo} value={bolso.valores[it.id]} label={it.nombre} onPick={(v) => manual(setValue(bolso, it.id, v))} />}
+                            ? <div className="opts"><Stepper id={`q-${it.id}`} value={bolso.cant[it.id]} bad={st.level === "bad"} warn={st.level === "warn" && st.falta} onChange={(n) => manual(setCant(bolso, it.id, n))} /></div>
+                            : <Options kind={it.tipo} value={bolso.valores[it.id]} label={it.nombre} leve={!esVital(it, c)} onPick={(v) => manual(setValue(bolso, it.id, v))} />}
                         </li>
                       ))}
                     </ul>

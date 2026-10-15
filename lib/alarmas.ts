@@ -60,8 +60,9 @@ export function planificar(
     }
     const r = resumen(b.bolso, now);
     const debido = b.ultimoFaltante === undefined || now.getTime() - b.ultimoFaltante >= (FALTANTES_CADA_HORAS - 1) * 3600e3;
-    if (r.cargados > 0 && r.faltan > 0 && debido) {
-      destinatarios.forEach((e) => de(e).falt.push({ b, n: r.faltan }));
+    const nFaltan = r.faltan + r.leves.length; // red and yellow: both need restocking
+    if (r.cargados > 0 && nFaltan > 0 && debido) {
+      destinatarios.forEach((e) => de(e).falt.push({ b, n: nFaltan }));
       marcas.push({ coleccion: "bolso", id: b.id, campo: "ultimoFaltante", valor: now.getTime() });
     }
   }

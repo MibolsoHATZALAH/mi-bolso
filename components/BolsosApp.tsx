@@ -262,7 +262,7 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
   const conFaltantes = activos.filter((x) => x.r.cargados && x.r.faltan).length;
   const sinCargar = activos.filter((x) => !x.r.cargados).length;
   // "complete" only when every item was checked and nothing is missing
-  const ok = activos.filter((x) => x.r.cargados === x.r.total && !x.r.faltan).length;
+  const ok = activos.filter((x) => x.r.cargados === x.r.total && !x.r.faltan && !x.r.leves.length).length;
 
   async function copiar() {
     const txt = buildCopyTextVarios(bolsos.map((b) => ({ nombre: b.nombre, ubicacion: b.ubicacion, bolso: b.bolso, fueraDeServicio: b.fueraDeServicio })));
@@ -278,7 +278,7 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
           {chip}
         </div>
         <div className={`meter ${fueraN ? "cuatro" : ""}`}>
-          <div className="tile bad"><b className="num">{conFaltantes}</b><span>Con faltantes</span></div>
+          <div className="tile bad"><b className="num">{conFaltantes}</b><span>Faltan vitales</span></div>
           <div className="tile ok"><b className="num">{ok}</b><span>Completos</span></div>
           <div className="tile"><b className="num">{sinCargar}</b><span>Sin cargar</span></div>
           {fueraN > 0 && <div className="tile fuera"><b className="num">{fueraN}</b><span>Fuera de servicio</span></div>}
@@ -336,7 +336,7 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
       {atencion.length > 0 && (
         <section className="barrio atencion">
           <h2 className="barrio-head"><span>Atención</span><span className="barrio-n">{atencion.length}</span></h2>
-          <p className="atencion-nota">Fuera de servicio o con faltantes</p>
+          <p className="atencion-nota">Fuera de servicio o con faltantes vitales (en rojo)</p>
           <ul className={`bags ${claseCols}`}>{atencion.map((x) => card(x, true))}</ul>
         </section>
       )}
@@ -402,7 +402,8 @@ function BagCard({ x, user, toast, onOpen, conBarrio }: { x: Dato; user: User; t
   const viejo = r.cargados > 0 && dias !== null && dias >= STALE_DAYS;
   const parcial = r.cargados > 0 && r.cargados < r.total;
   const fuera = b.fueraDeServicio;
-  const estado = fuera ? "fuera" : !r.cargados ? "none" : r.faltan ? "bad" : r.atencion || parcial ? "warn" : "ok";
+  const estado = fuera ? "fuera" : !r.cargados ? "none" : r.faltan ? "bad" : r.leves.length || r.atencion || parcial ? "warn" : "ok";
+  const nl = r.leves.length;
   const vencidos = av.filter((a) => a.dias < 0).length, porVencer = av.length - vencidos;
   const T = ({ largo, corto }: { largo: string; corto: string }) => <><span className="t-largo">{largo}</span><span className="t-corto">{corto}</span></>;
   return (
@@ -432,10 +433,14 @@ function BagCard({ x, user, toast, onOpen, conBarrio }: { x: Dato; user: User; t
             {!r.cargados && <span className="bag-estado none">Sin cargar</span>}
             {r.cargados > 0 && r.faltan > 0 && (
               <span className="bag-estado bad"><span className="bag-estado-icon" aria-hidden="true">✕</span>
-                <T largo={r.faltan === 1 ? "Falta 1 elemento" : `Faltan ${r.faltan} elementos`} corto={`Faltan ${r.faltan}`} /></span>
+                <T largo={r.faltan === 1 ? "Falta 1 vital" : `Faltan ${r.faltan} vitales`} corto={`Faltan ${r.faltan}`} /></span>
             )}
-            {r.cargados > 0 && !r.faltan && !parcial && <span className="bag-estado ok"><span className="bag-estado-icon" aria-hidden="true">✓</span>Completo</span>}
-            {!r.faltan && parcial && <span className="bag-estado warn"><span className="bag-estado-icon" aria-hidden="true">!</span>
+            {r.cargados > 0 && !r.faltan && nl > 0 && (
+              <span className="bag-estado warn"><span className="bag-estado-icon" aria-hidden="true">!</span>
+                <T largo={nl === 1 ? "Falta 1 no vital" : `Faltan ${nl} no vitales`} corto={`Faltan ${nl}`} /></span>
+            )}
+            {r.cargados > 0 && !r.faltan && !nl && !parcial && <span className="bag-estado ok"><span className="bag-estado-icon" aria-hidden="true">✓</span>Completo</span>}
+            {!r.faltan && !nl && parcial && <span className="bag-estado warn"><span className="bag-estado-icon" aria-hidden="true">!</span>
               <T largo={`Revisado ${r.cargados} de ${r.total}`} corto={`${r.cargados}/${r.total}`} /></span>}
             {r.faltan > 0 && (
               <ul className="bag-miss">
@@ -443,11 +448,18 @@ function BagCard({ x, user, toast, onOpen, conBarrio }: { x: Dato; user: User; t
                 {r.faltan > 6 && <li className="mas">y {r.faltan - 6} más</li>}
               </ul>
             )}
+            {nl > 0 && (
+              <ul className="bag-miss leve">
+                {r.faltan > 0 && <li className="leve-head">{nl === 1 ? "Falta 1 no vital" : `Faltan ${nl} no vitales`}</li>}
+                {r.leves.slice(0, 6).map((y) => <li key={y.it.id}><span>{y.it.nombre}</span><span className="bag-miss-motivo">{y.st.motivo}</span></li>)}
+                {nl > 6 && <li className="mas">y {nl - 6} más</li>}
+              </ul>
+            )}
             <span className="bag-pills">
               {vencidos > 0 && <span className="pill bad">{vencidos} vencido{vencidos > 1 ? "s" : ""}</span>}
               {porVencer > 0 && <span className="pill warn">{porVencer} por vencer</span>}
               {r.atencion > 0 && <span className="pill warn">{r.atencion} atención</span>}
-              {r.faltan > 0 && parcial && <span className="pill warn">Revisado {r.cargados} de {r.total}</span>}
+              {(r.faltan > 0 || nl > 0) && parcial && <span className="pill warn">Revisado {r.cargados} de {r.total}</span>}
               {viejo && <span className="pill warn">Sin revisar hace {dias} días</span>}
             </span>
             <span className="bag-when">{b.actualizado ? `Revisado ${hace(b.actualizado)}${b.por ? ` por ${b.por}` : ""}` : "Nadie lo revisó todavía"}</span>

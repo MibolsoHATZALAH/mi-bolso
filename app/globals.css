@@ -518,3 +518,18 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 .bags.cuatro .disp{font-size:11px}
 .bags.cuatro .bag-cerrado{font-size:11px;padding:5px 7px}
 @media (min-width:900px){ .bags.cuatro .entrecalles{font-size:13px} .bags.cuatro .disp{font-size:13px} .bags.cuatro .bag-cerrado{font-size:13px} }
+
+/* ---------- Vital (red) vs. non-vital (yellow) missing items ---------- */
+.row.is-warn .name>span:first-child{color:var(--warn);font-weight:600}
+.step.warn{background:var(--warn-bg)} .step.warn input{color:var(--warn)}
+.opt.on.warn{background:var(--orange)}
+.cnt.warn,.tab .cnt.warn{background:var(--orange)}
+.summary.leve::before{background:linear-gradient(120deg,var(--warn-bg),transparent 45%)}
+.sum-group.leves h3{color:var(--warn)}
+.bag-miss.leve li{color:var(--warn);font-weight:600;font-size:16px}
+.bag-miss.leve li.leve-head{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding-top:10px}
+.vital-toggle{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--bad);white-space:nowrap}
+.vital-toggle input{width:20px;height:20px;accent-color:var(--red);margin:0}
+.bags.cuatro .bag-miss.leve li.leve-head{font-size:10.5px;padding-top:6px;letter-spacing:0}
+.bags.dos .bag-miss.leve li.leve-head{font-size:12px}
+.edit-row .vital-toggle{color:var(--bad);font-weight:600}

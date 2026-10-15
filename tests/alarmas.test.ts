@@ -78,7 +78,8 @@ test("an expired date marks the item even before SÍ is tapped", async () => {
   const f = findItem(b, "fm4")!;
   assert.deepEqual(statusOf(b, f.it, f.c, now), { level: "bad", motivo: "Vencido" });
   const n = setValue(b, "fm4", "NO")!.next;
-  assert.deepEqual(statusOf(n, f.it, f.c, now), { level: "bad", motivo: "Falta" });
+  // epinefrina is not on the vital list: missing is yellow
+  assert.deepEqual(statusOf(n, f.it, f.c, now), { level: "warn", motivo: "Falta", falta: true });
 });
 
 test("out-of-service bags get no alarms", () => {
