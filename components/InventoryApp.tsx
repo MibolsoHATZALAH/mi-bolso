@@ -165,7 +165,7 @@ export default function InventoryApp({
 
         <AlarmaVenc bolso={bolso} clave={`${tabKey}-${title}`} />
 
-        {listaEquipo && !mismaLista(bolso.catalog, listaEquipo) && listaOculta !== JSON.stringify(listaEquipo).length + "" && (() => {
+        {listaEquipo && !mismaLista(bolso.catalog, listaEquipo) && listaOculta !== listaEquipo.secciones.flatMap((x) => x.categorias.flatMap((c) => c.items.map((i) => i.id))).join() && (() => {
           const dif = difLista(bolso, listaEquipo);
           const usar = () => {
             persist(copiarLista(bolso, { ...bolso, catalog: listaEquipo }), { tipo: "ajuste", nota: "Lista copiada de los bolsos de la institución", cambios: [] });
@@ -185,7 +185,7 @@ export default function InventoryApp({
                 {verLista
                   ? <><button className="btn primary" id="usar-lista" onClick={usar}>Usar esta lista</button><button className="btn" onClick={() => setVerLista(false)}>Cancelar</button></>
                   : <><button className="btn primary" id="ver-lista" onClick={() => setVerLista(true)}>Ver y actualizar</button>
-                    <button className="btn" onClick={() => { const k = JSON.stringify(listaEquipo).length + ""; setListaOculta(k); try { localStorage.setItem(`${tabKey}-lista-oculta`, k); } catch {} }}>Ahora no</button></>}
+                    <button className="btn" onClick={() => { const k = listaEquipo.secciones.flatMap((x) => x.categorias.flatMap((c) => c.items.map((i) => i.id))).join(); setListaOculta(k); try { localStorage.setItem(`${tabKey}-lista-oculta`, k); } catch {} }}>Ahora no</button></>}
               </div>
             </section>
           );

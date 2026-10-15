@@ -381,7 +381,10 @@ export function copiarLista(b: Bolso, origen: Bolso): Bolso {
 }
 
 /* ---------- The team's list (institutional bags) for personal bags ---------- */
-const claveLista = (c: Catalog) => JSON.stringify(c);
+// the database doesn't keep the order of fields inside an item, so compare with sorted keys
+const ordenar = (v: unknown): unknown => Array.isArray(v) ? v.map(ordenar)
+  : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, ordenar((v as Record<string, unknown>)[k])])) : v;
+const claveLista = (c: Catalog) => JSON.stringify(ordenar(c));
 export const mismaLista = (a: Catalog, b: Catalog) => claveLista(a) === claveLista(b);
 /** The list most institutional bags use (they normally all share one). Ties: the first one given. */
 export function listaComun(catalogs: Catalog[]): Catalog | null {

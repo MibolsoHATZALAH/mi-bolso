@@ -171,3 +171,12 @@ test("team list: the list most bags use, and what copying it changes in a person
   assert.equal(n.valores.m1, undefined);
   assert.equal(listaComun([]), null);
 });
+
+test("team list: the same list with fields in another order counts as the same", async () => {
+  const { listaComun, mismaLista } = await import("../lib/inventory.ts");
+  const a = emptyBolso().catalog;
+  const b = JSON.parse(JSON.stringify(a), (_k, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).reverse()) : v);
+  assert.ok(mismaLista(a, b));
+  const c = setValue(emptyBolso(), "ft4", "SI")!.next.catalog;
+  assert.ok(mismaLista(listaComun([b, a, c])!, a));
+});
