@@ -6,11 +6,12 @@ import { alertasVenc, buildCopyTextVarios, resumen, type Bolso, type CambioLista
 import {
   ADMINS, agregarMiembro, aplicarListaEnOtros, aprobar, bolsoStore, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
   quitarMiembro, rechazar, subscribeAcceso, subscribeBolsos, subscribeEquipo, subscribeSolicitudes,
-  type Acceso, type BolsoInst, type Miembro, type Rol, type Solicitud,
+  type Acceso, type BolsoInst, type DatosBolso, type Miembro, type Rol, type Solicitud,
 } from "@/lib/bolsos";
 import InventoryApp from "./InventoryApp";
 import { UserChip } from "./Login";
 import AlarmasPush from "./AlarmasPush";
+import { BARRIOS } from "@/lib/config";
 
 const STALE_DAYS = 30; // a bag nobody has checked in this long gets flagged
 type Vista = { k: "lista" } | { k: "bolso"; id: string } | { k: "equipo" };
@@ -118,8 +119,8 @@ function BolsoView({ b, bolsos, user, gerencia, chip, onBack, toast }: {
   b: BolsoInst; bolsos: BolsoInst[]; user: User; gerencia: boolean; chip: React.ReactNode; onBack: () => void; toast: (m: string) => void;
 }) {
   const store = useMemo(() => bolsoStore(b.id, user), [b.id, user]);
-  const [nombre, setNombre] = useState(b.nombre);
-  const [ubic, setUbic] = useState(b.ubicacion);
+  const datosDe = (x: BolsoInst): DatosBolso => ({ nombre: x.nombre, ubicacion: x.ubicacion, direccion: x.direccion, barrio: x.barrio, horario: x.horario });
+  const [datos, setDatos] = useState<DatosBolso>(datosDe(b));
   const [borrar, setBorrar] = useState(false);
   const [igualar, setIgualar] = useState(false);
   const otros = bolsos.length - 1;
@@ -131,21 +132,20 @@ function BolsoView({ b, bolsos, user, gerencia, chip, onBack, toast }: {
       .then((n) => { if (n) toast(`Lista actualizada en ${n === 1 ? "1 bolso más" : `${n} bolsos más`}`); })
       .catch(() => toast("No se pudo actualizar la lista en los otros bolsos"));
   }, [b.id, toast]);
-  useEffect(() => { setNombre(b.nombre); setUbic(b.ubicacion); }, [b.nombre, b.ubicacion]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setDatos(datosDe(b)); }, [b.nombre, b.ubicacion, b.direccion, b.barrio, b.horario]);
 
-  const guardarDatos = () => {
-    if (!nombre.trim()) { setNombre(b.nombre); return; }
-    if (nombre.trim() === b.nombre && ubic.trim() === b.ubicacion) return;
-    editarBolso(b.id, { nombre, ubicacion: ubic }).then(() => toast("Datos del bolso guardados")).catch(() => toast("No se pudo guardar"));
+  const guardarDatos = (d: DatosBolso = datos) => {
+    if (!d.nombre.trim()) { setDatos((x) => ({ ...x, nombre: b.nombre })); return; }
+    const antes = datosDe(b);
+    if ((Object.keys(d) as (keyof DatosBolso)[]).every((k) => d[k].trim() === antes[k])) return;
+    editarBolso(b.id, d).then(() => toast("Datos del bolso guardados")).catch(() => toast("No se pudo guardar"));
   };
 
   const editExtra = gerencia ? (
     <section className="cat bag-admin">
       <div className="cat-head"><h3>Datos del bolso</h3></div>
-      <div className="form-grid">
-        <label htmlFor="bag-nombre">Nombre<input id="bag-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} onBlur={guardarDatos} /></label>
-        <label htmlFor="bag-ubic">Ubicación<input id="bag-ubic" value={ubic} placeholder="Dónde está guardado" onChange={(e) => setUbic(e.target.value)} onBlur={guardarDatos} /></label>
-      </div>
+      <CamposBolso id="bag" datos={datos} bolsos={bolsos} onChange={setDatos} onCommit={guardarDatos} />
       {borrar ? (
         <div className="confirm">
           <span>¿Eliminar <b>{b.nombre}</b>? Se borra su inventario y deja de aparecer para todos.</span>
@@ -172,7 +172,7 @@ function BolsoView({ b, bolsos, user, gerencia, chip, onBack, toast }: {
 
   return (
     <InventoryApp
-      store={store} title={b.nombre} subtitle={b.ubicacion} top={chip}
+      store={store} title={b.nombre} subtitle={[b.direccion, b.ubicacion, b.horario && `Horario: ${b.horario}`].filter(Boolean).join(" · ")} top={chip}
       back={{ label: "Todos los bolsos", onClick: onBack }}
       canEditList={gerencia} editExtra={editExtra} copyTitle={b.nombre}
       onListaChange={gerencia && otros > 0 ? onListaChange : undefined}
@@ -191,6 +191,16 @@ function Lista({ bolsos, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, 
   const [nuevo, setNuevo] = useState(false);
   const [copyFallback, setCopyFallback] = useState("");
   const datos = useMemo(() => bolsos.map((b) => ({ b, r: resumen(b.bolso), av: alertasVenc(b.bolso) })), [bolsos]);
+  // grouped by neighborhood, in the spreadsheet's order; unknown ones after, bags without one last
+  const grupos = useMemo(() => {
+    const m = new Map<string, typeof datos>();
+    for (const x of datos) { const k = x.b.barrio.trim() || "Sin barrio"; if (!m.has(k)) m.set(k, []); m.get(k)!.push(x); }
+    const rank = (k: string) => { const i = BARRIOS.findIndex((x) => x.toLowerCase() === k.toLowerCase()); return k === "Sin barrio" ? 1e4 : i < 0 ? 1e3 : i; };
+    return [...m.entries()].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b, "es")).map(([barrio, items]) => ({ barrio, items }));
+  }, [datos]);
+  const [cols, setCols] = useState<1 | 2>(1);
+  useEffect(() => { try { if (localStorage.getItem("bolsos-columnas") === "2") setCols(2); } catch {} }, []);
+  const elegirCols = (n: 1 | 2) => { setCols(n); try { localStorage.setItem("bolsos-columnas", String(n)); } catch {} };
   const conFaltantes = datos.filter((x) => x.r.cargados && x.r.faltan).length;
   const sinCargar = datos.filter((x) => !x.r.cargados).length;
   // "complete" only when every item was checked and nothing is missing
@@ -238,8 +248,21 @@ function Lista({ bolsos, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, 
         </p>
       )}
 
-      <ul className="bags">
-        {datos.map(({ b, r, av }) => {
+      {bolsos.length > 1 && (
+        <div className="toolbar vista">
+          <span className="vista-label">{grupos.length > 1 ? `${bolsos.length} bolsos en ${grupos.length} barrios` : `${bolsos.length} bolsos`}</span>
+          <div className="seg-filter" role="group" aria-label="Columnas">
+            <button aria-pressed={cols === 1} onClick={() => elegirCols(1)}>1 columna</button>
+            <button aria-pressed={cols === 2} onClick={() => elegirCols(2)}>2 columnas</button>
+          </div>
+        </div>
+      )}
+
+      {grupos.map((g) => (
+      <section className="barrio" key={g.barrio}>
+      {grupos.length > 1 && <h2 className="barrio-head"><span>{g.barrio}</span><span className="barrio-n">{g.items.length}</span></h2>}
+      <ul className={`bags ${cols === 2 ? "dos" : ""}`}>
+        {g.items.map(({ b, r, av }) => {
           const dias = diasDesde(b.actualizado);
           const viejo = r.cargados > 0 && dias !== null && dias >= STALE_DAYS;
           const parcial = r.cargados > 0 && r.cargados < r.total;
@@ -248,8 +271,11 @@ function Lista({ bolsos, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, 
             <li key={b.id}>
               <button className={`bag ${estado}`} onClick={() => onOpen(b.id)}>
                 <span className="bag-main">
-                  <span className="bag-name">{b.nombre}</span>
-                  {b.ubicacion && <span className="bag-where">{b.ubicacion}</span>}
+                  <span className="bag-top">
+                    <span className="bag-name">{b.nombre}</span>
+                    {b.horario && <span className="bag-horario">{b.horario}</span>}
+                  </span>
+                  {(b.direccion || b.ubicacion) && <span className="bag-where">{[b.direccion, b.ubicacion].filter(Boolean).join(" · ")}</span>}
                   {/* big, readable status: what a dispatcher needs in an emergency */}
                   {!r.cargados && <span className="bag-estado none">Sin cargar</span>}
                   {r.cargados > 0 && r.faltan > 0 && (
@@ -278,37 +304,60 @@ function Lista({ bolsos, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, 
           );
         })}
       </ul>
+      </section>
+      ))}
     </div>
   );
 }
 
 function NuevoBolso({ bolsos, onDone, toast }: { bolsos: BolsoInst[]; onDone: (id: string) => void; toast: (m: string) => void }) {
-  const [nombre, setNombre] = useState("");
-  const [ubic, setUbic] = useState("");
-  const [base, setBase] = useState("");
+  const [datos, setDatos] = useState<DatosBolso>({ nombre: "", ubicacion: "", direccion: "", barrio: "", horario: "" });
+  // new bags start with the list the other bags use (most recently checked bag)
+  const ultimo = [...bolsos].sort((a, b) => (b.actualizado?.getTime() ?? 0) - (a.actualizado?.getTime() ?? 0))[0];
+  const [base, setBase] = useState(ultimo?.id ?? "");
   const [busy, setBusy] = useState(false);
   return (
     <form className="summary clear new-bag" onSubmit={async (e) => {
-      e.preventDefault(); if (!nombre.trim()) return;
+      e.preventDefault(); if (!datos.nombre.trim()) return;
       setBusy(true);
       try {
         const copia: Bolso | undefined = bolsos.find((x) => x.id === base)?.bolso;
-        onDone(await crearBolso(nombre, ubic, copia));
+        onDone(await crearBolso(datos, copia));
       } catch { toast("No se pudo crear el bolso"); } finally { setBusy(false); }
     }}>
       <h2>Nuevo bolso</h2>
+      <CamposBolso id="nb" datos={datos} bolsos={bolsos} onChange={setDatos} />
       <div className="form-grid">
-        <label htmlFor="nb-nombre">Nombre<input id="nb-nombre" required value={nombre} placeholder="Ej.: Bolso Sede Central" onChange={(e) => setNombre(e.target.value)} /></label>
-        <label htmlFor="nb-ubic">Ubicación<input id="nb-ubic" value={ubic} placeholder="Ej.: Recepción, planta baja" onChange={(e) => setUbic(e.target.value)} /></label>
         <label htmlFor="nb-base">Lista de elementos
           <select id="nb-base" value={base} onChange={(e) => setBase(e.target.value)}>
+            {bolsos.map((b) => <option key={b.id} value={b.id}>La misma lista que {b.nombre}</option>)}
             <option value="">Lista estándar de Mi Bolso</option>
-            {bolsos.map((b) => <option key={b.id} value={b.id}>Copiar la lista de {b.nombre}</option>)}
           </select>
         </label>
       </div>
-      <div className="acts"><button className="btn primary" disabled={busy || !nombre.trim()}>{busy ? "Creando…" : "Crear bolso"}</button></div>
+      <div className="acts"><button className="btn primary" disabled={busy || !datos.nombre.trim()}>{busy ? "Creando…" : "Crear bolso"}</button></div>
     </form>
+  );
+}
+
+/** Name, neighborhood, address, place inside the building and opening hours of a bag. */
+function CamposBolso({ id, datos, bolsos, onChange, onCommit }: {
+  id: string; datos: DatosBolso; bolsos: BolsoInst[]; onChange: (d: DatosBolso) => void; onCommit?: (d: DatosBolso) => void;
+}) {
+  const set = (k: keyof DatosBolso) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => onChange({ ...datos, [k]: e.target.value });
+  const barrios = [...new Set([...BARRIOS, ...bolsos.map((b) => b.barrio).filter(Boolean)])];
+  const blur = () => onCommit?.(datos);
+  return (
+    <div className="form-grid">
+      <label htmlFor={`${id}-nombre`}>Nombre<input id={`${id}-nombre`} required value={datos.nombre} placeholder="Ej.: Beit Jabad Central" onChange={set("nombre")} onBlur={blur} /></label>
+      <label htmlFor={`${id}-barrio`}>Barrio
+        <input id={`${id}-barrio`} list={`${id}-barrios`} value={datos.barrio} placeholder="Elegí o escribí uno" onChange={set("barrio")} onBlur={blur} />
+        <datalist id={`${id}-barrios`}>{barrios.map((x) => <option key={x} value={x} />)}</datalist>
+      </label>
+      <label htmlFor={`${id}-dir`}>Dirección<input id={`${id}-dir`} value={datos.direccion} placeholder="Ej.: Agüero 1164" onChange={set("direccion")} onBlur={blur} /></label>
+      <label htmlFor={`${id}-ubic`}>Dónde está adentro<input id={`${id}-ubic`} value={datos.ubicacion} placeholder="Ej.: Recepción, planta baja" onChange={set("ubicacion")} onBlur={blur} /></label>
+      <label htmlFor={`${id}-horario`}>Horario<input id={`${id}-horario`} value={datos.horario} placeholder="Ej.: L a V de 9 a 17 · 24 hs" onChange={set("horario")} onBlur={blur} /></label>
+    </div>
   );
 }
 

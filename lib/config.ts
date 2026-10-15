@@ -11,3 +11,6 @@ export const FALTANTES_CADA_HORAS = 48;
 
 /** Public "Web Push certificate" key of the Firebase project (Cloud Messaging). Public by design. */
 export const VAPID_KEY = "BBx-Oso7SaBkdUr7Tspdmy1hAdCOO8VqFqYr7jknams10KU1KldqoyiwWw_hT9RcHF8pBo0JsZpnf7cqNlGji_8";
+
+/** Neighborhoods of the shared bags, in the order the institution's spreadsheet lists them. */
+export const BARRIOS = ["Congreso", "Once", "Flores", "Palermo", "Belgrano", "Barracas", "Paternal", "Villa Crespo / Chacarita", "Otros"];

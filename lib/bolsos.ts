@@ -20,7 +20,11 @@ export type Rol = "voluntario" | "gerencia";
 export type Acceso = { estado: "cargando" } | { estado: "pendiente" } | { estado: "miembro"; rol: Rol };
 export type Miembro = { email: string; rol: Rol; nombre: string };
 export type Solicitud = { email: string; nombre: string; foto: string; t: Date };
-export type BolsoInst = { id: string; nombre: string; ubicacion: string; bolso: Bolso; actualizado: Date | null; por: string };
+export type BolsoInst = {
+  id: string; nombre: string; ubicacion: string; direccion: string; barrio: string; horario: string;
+  bolso: Bolso; actualizado: Date | null; por: string;
+};
+export type DatosBolso = { nombre: string; ubicacion: string; direccion: string; barrio: string; horario: string };
 
 export const emailDe = (u: User) => (u.email ?? "").trim().toLowerCase();
 export const esAdmin = (u: User) => ADMINS.includes(emailDe(u));
@@ -88,20 +92,21 @@ export function subscribeBolsos(next: (b: BolsoInst[]) => void, onError: (e: Err
   return onSnapshot(collection(db(), "bolsos"), (snap) => {
     next(snap.docs.map((d) => {
       const x = d.data({ serverTimestamps: "estimate" });
-      return { id: d.id, nombre: x.nombre ?? "Bolso", ubicacion: x.ubicacion ?? "", bolso: toBolso(x),
+      return { id: d.id, nombre: x.nombre ?? "Bolso", ubicacion: x.ubicacion ?? "", direccion: x.direccion ?? "", barrio: x.barrio ?? "", horario: x.horario ?? "",
+        bolso: toBolso(x),
         actualizado: (x.actualizado as Timestamp)?.toDate?.() ?? null, por: x.actualizadoPor?.nombre ?? "" };
     }).sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true })));
   }, onError);
 }
-export async function crearBolso(nombre: string, ubicacion: string, copiarDe?: Bolso) {
+const limpio = (d: DatosBolso) => ({ nombre: d.nombre.trim(), ubicacion: d.ubicacion.trim(), direccion: d.direccion.trim(), barrio: d.barrio.trim(), horario: d.horario.trim() });
+export async function crearBolso(datos: DatosBolso, copiarDe?: Bolso) {
   const ref = doc(collection(db(), "bolsos"));
   const base = emptyBolso();
   if (copiarDe) base.catalog = JSON.parse(JSON.stringify(copiarDe.catalog));
-  await setDoc(ref, { ...base, nombre: nombre.trim(), ubicacion: ubicacion.trim(), creado: serverTimestamp(), actualizado: null, actualizadoPor: null });
+  await setDoc(ref, { ...base, ...limpio(datos), creado: serverTimestamp(), actualizado: null, actualizadoPor: null });
   return ref.id;
 }
-export const editarBolso = (id: string, datos: { nombre: string; ubicacion: string }) =>
-  updateDoc(bolsoRef(id), { nombre: datos.nombre.trim(), ubicacion: datos.ubicacion.trim() });
+export const editarBolso = (id: string, datos: DatosBolso) => updateDoc(bolsoRef(id), limpio(datos));
 export const borrarBolso = (id: string) => deleteDoc(bolsoRef(id));
 
 /** The inventory screen's store for one shared bag. Every change is signed with the person's name. */

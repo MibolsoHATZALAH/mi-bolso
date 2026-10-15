@@ -1,0 +1,32 @@
+# One-time (and safe to repeat) load of the institution's bags from data/bolsos-instituciones.json.
+# Never duplicates and never deletes. Run it from Actions → "Importar bolsos" → Run workflow.
+name: Importar bolsos
+
+on:
+  workflow_dispatch:
+    inputs:
+      prueba:
+        description: "Sólo mostrar qué haría, sin guardar"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency: importar-bolsos
+
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Importar
+        run: node --experimental-strip-types scripts/importar-bolsos.ts ${{ inputs.prueba && '--dry-run' || '' }}
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
