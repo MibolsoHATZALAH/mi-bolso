@@ -11,7 +11,7 @@ import { APP_URL, FALTANTES_CADA_HORAS } from "./config.ts";
 
 export type Personal = { uid: string; bolso: Bolso; ultimoVenc?: string };
 export type Compartido = {
-  id: string; nombre: string; bolso: Bolso; ultimoPorEmail?: string;
+  id: string; nombre: string; bolso: Bolso; ultimoPorEmail?: string; fueraDeServicio?: boolean;
   ultimoVenc?: string; ultimoFaltante?: number; // ms
 };
 /** Recipient: "uid:<uid>" for a personal bag's owner, "email:<email>" for shared-bag recipients. */
@@ -48,6 +48,7 @@ export function planificar(
     return porPersona.get(email)!;
   };
   for (const b of compartidos) {
+    if (b.fueraDeServicio) continue; // the team already knows it can't count on it
     const destinatarios = [...new Set([...gerenciaSet, ...(b.ultimoPorEmail ? [b.ultimoPorEmail.toLowerCase()] : [])])];
     if (b.ultimoVenc !== hoy) {
       const a = alertasVenc(b.bolso, now);

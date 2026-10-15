@@ -23,6 +23,8 @@ export type Solicitud = { email: string; nombre: string; foto: string; t: Date }
 export type BolsoInst = {
   id: string; nombre: string; ubicacion: string; direccion: string; barrio: string; horario: string;
   bolso: Bolso; actualizado: Date | null; por: string;
+  /** Out of service: the team can't count on this bag (closed, taken away, broken…). */
+  fueraDeServicio: boolean; servicioPor: string; servicioDesde: Date | null;
 };
 export type DatosBolso = { nombre: string; ubicacion: string; direccion: string; barrio: string; horario: string };
 
@@ -94,6 +96,8 @@ export function subscribeBolsos(next: (b: BolsoInst[]) => void, onError: (e: Err
       const x = d.data({ serverTimestamps: "estimate" });
       return { id: d.id, nombre: x.nombre ?? "Bolso", ubicacion: x.ubicacion ?? "", direccion: x.direccion ?? "", barrio: x.barrio ?? "", horario: x.horario ?? "",
         bolso: toBolso(x),
+        fueraDeServicio: x.fueraDeServicio === true, servicioPor: x.servicioCambio?.nombre ?? "",
+        servicioDesde: (x.servicioCambio?.t as Timestamp)?.toDate?.() ?? null,
         actualizado: (x.actualizado as Timestamp)?.toDate?.() ?? null, por: x.actualizadoPor?.nombre ?? "" };
     }).sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true })));
   }, onError);
@@ -188,4 +192,13 @@ export async function copiarListaATodos(bolsos: BolsoInst[], origen: BolsoInst) 
   }
   if (n) await batch.commit();
   return n;
+}
+
+/** Marks a shared bag in or out of service. Any team member can do it; it is signed and logged in the bag's history. */
+export async function cambiarServicio(id: string, fuera: boolean, user: User) {
+  const por = { uid: user.uid, nombre: nombreDe(user), email: emailDe(user) };
+  const batch = writeBatch(db());
+  batch.update(bolsoRef(id), { fueraDeServicio: fuera, servicioCambio: { ...por, t: serverTimestamp() } });
+  batch.set(doc(movsCol(id)), { tipo: "servicio", nota: fuera ? "Marcado fuera de servicio" : "De nuevo en servicio", cambios: [], t: serverTimestamp(), por });
+  await batch.commit();
 }

@@ -23,7 +23,7 @@ export type Cambio = {
   de: string | number | null;
   a: string | number | null;
 };
-export type TipoMov = "uso" | "repo" | "ajuste";
+export type TipoMov = "uso" | "repo" | "ajuste" | "servicio";
 /** `por` = display name of who did it (shared bags only). */
 export type Movimiento = { id: string; t: Date; tipo: TipoMov; nota: string; cambios: Cambio[]; por?: string };
 
@@ -276,11 +276,13 @@ export function resumen(b: Bolso, now = new Date()): Resumen {
 }
 
 /** One restocking text for several bags (management view). Bags never loaded are listed apart. */
-export function buildCopyTextVarios(bolsos: { nombre: string; ubicacion?: string; bolso: Bolso }[], now = new Date()) {
+export function buildCopyTextVarios(bolsos: { nombre: string; ubicacion?: string; bolso: Bolso; fueraDeServicio?: boolean }[], now = new Date()) {
   let t = `Bolsos – reposición al ${fmtDate(now)}\n`;
   const sinCargar: string[] = [];
   let algo = false;
+  const fuera: string[] = [];
   for (const x of bolsos) {
+    if (x.fueraDeServicio) { fuera.push(x.nombre); continue; }
     const r = resumen(x.bolso, now);
     if (!r.cargados) { sinCargar.push(x.nombre); continue; }
     if (!r.faltan && !r.atencion) continue;
@@ -294,6 +296,7 @@ export function buildCopyTextVarios(bolsos: { nombre: string; ubicacion?: string
   }
   if (!algo) t += `\nNo falta nada en los bolsos revisados.\n`;
   if (sinCargar.length) t += `\nTodavía sin inventariar: ${sinCargar.join(", ")}\n`;
+  if (fuera.length) t += `\nFuera de servicio: ${fuera.join(", ")}\n`;
   return t.trim();
 }
 

@@ -13,7 +13,7 @@ rules_version = '2';
 //   bolsos/{id}                    un bolso: nombre, ubicación + inventario
 //   bolsos/{id}/movimientos/{id}   su historial, firmado por quien lo hizo (por)
 //
-// Voluntario: ve todos los bolsos, carga usos / reposiciones / ajustes.
+// Voluntario: ve todos los bolsos, carga usos / reposiciones / ajustes y marca en servicio / fuera de servicio.
 // Gerencia: además crea, renombra y elimina bolsos, edita las listas y maneja el equipo.
 // Administradores (lista fija, igual que ADMINS en lib/bolsos.ts): siempre gerencia.
 service cloud.firestore {
@@ -56,7 +56,12 @@ service cloud.firestore {
       allow update: if gerencia()
         || (miembro()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['valores', 'cant', 'venc', 'actualizado', 'actualizadoPor'])
-            && request.resource.data.actualizadoPor.uid == request.auth.uid);
+            && request.resource.data.actualizadoPor.uid == request.auth.uid)
+        // cualquiera del equipo marca el bolso en servicio / fuera de servicio (queda firmado)
+        || (miembro()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fueraDeServicio', 'servicioCambio'])
+            && request.resource.data.fueraDeServicio is bool
+            && request.resource.data.servicioCambio.uid == request.auth.uid);
 
       match /movimientos/{m} {
         allow read: if miembro();

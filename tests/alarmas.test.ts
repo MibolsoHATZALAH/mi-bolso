@@ -80,3 +80,10 @@ test("an expired date marks the item even before SÍ is tapped", async () => {
   const n = setValue(b, "fm4", "NO")!.next;
   assert.deepEqual(statusOf(n, f.it, f.c, now), { level: "bad", motivo: "Falta" });
 });
+
+test("out-of-service bags get no alarms", () => {
+  const sede = compartido("sede", "Sede", (b) => setVenc(setCant(b, "ft7", 1)!.next, "fm4", ymd(-1))!.next, { fueraDeServicio: true });
+  const r = planificar({ personales: [], compartidos: [sede], gerencia: ["jefe@gmail.com"], now, hoy });
+  assert.equal(r.avisos.length, 0);
+  assert.equal(r.marcas.length, 0);
+});

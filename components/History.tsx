@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { fmtDay, fmtWhen, type Cambio, type Movimiento } from "@/lib/inventory";
 
-const LBL: Record<string, [string, string]> = { uso: ["Uso en emergencia", "bad"], repo: ["Reposición", "ok"], ajuste: ["Ajuste manual", "info"] };
+const LBL: Record<string, [string, string]> = { uso: ["Uso en emergencia", "bad"], repo: ["Reposición", "ok"], ajuste: ["Ajuste manual", "info"], servicio: ["Servicio", "warn"] };
 
 function changeText(ch: Cambio) {
   if (ch.campo === "venc") return <>{ch.nombre}: vence {ch.de ? fmtDay(String(ch.de)) : "—"} → {ch.a ? fmtDay(String(ch.a)) : "—"}</>;

@@ -4,7 +4,7 @@ import { signOut, type User } from "firebase/auth";
 import { fb } from "@/lib/firebase";
 import { alertasVenc, buildCopyTextVarios, resumen, type Bolso, type CambioLista } from "@/lib/inventory";
 import {
-  ADMINS, agregarMiembro, aplicarListaEnOtros, aprobar, bolsoStore, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
+  ADMINS, agregarMiembro, aplicarListaEnOtros, aprobar, bolsoStore, cambiarServicio, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
   quitarMiembro, rechazar, subscribeAcceso, subscribeBolsos, subscribeEquipo, subscribeSolicitudes,
   type Acceso, type BolsoInst, type DatosBolso, type Miembro, type Rol, type Solicitud,
 } from "@/lib/bolsos";
@@ -107,7 +107,7 @@ function BolsosApp({ user, rol }: { user: User; rol: Rol }) {
     <>
       {vista.k === "equipo" && gerencia
         ? <Equipo user={user} solicitudes={solicitudes} chip={chip} onBack={() => ir({ k: "lista" })} toast={toast} />
-        : <Lista bolsos={bolsos} gerencia={gerencia} pendientes={solicitudes.length} chip={chip} alarmas={<AlarmasPush user={user} app="bolsos" />}
+        : <Lista bolsos={bolsos} user={user} gerencia={gerencia} pendientes={solicitudes.length} chip={chip} alarmas={<AlarmasPush user={user} app="bolsos" />}
             onOpen={(id) => ir({ k: "bolso", id })} onEquipo={() => ir({ k: "equipo" })} toast={toast} />}
       <div className={`toast ${toastMsg ? "show" : ""}`} role="status">{toastMsg}</div>
     </>
@@ -178,14 +178,23 @@ function BolsoView({ b, bolsos, user, gerencia, chip, onBack, toast }: {
       onListaChange={gerencia && otros > 0 ? onListaChange : undefined}
       editNote={otros > 0 ? `Los cambios en la lista (agregar, quitar, renombrar, tipo o mínimo) se aplican también en los otros ${otros === 1 ? "bolso" : `${otros} bolsos`}. Las cantidades y vencimientos de cada bolso no cambian.` : undefined}
       savedText={b.actualizado ? `Revisado ${hace(b.actualizado)}${b.por ? ` por ${b.por}` : ""} · lo ve todo el equipo` : "Lo que cargues lo ve todo el equipo"}
-      loadingText="Cargando el bolso…" tabKey="bolsos-tab" bandExtra={<AlarmasPush user={user} app="bolsos" />}
+      loadingText="Cargando el bolso…" tabKey="bolsos-tab"
+      bandExtra={<>
+        <div className={`servicio-fila ${b.fueraDeServicio ? "off" : ""}`}>
+          <span>{b.fueraDeServicio
+            ? <><b>Fuera de servicio</b> · no contar con este bolso{b.servicioPor ? ` · marcado por ${b.servicioPor}` : ""}{b.servicioDesde ? ` ${hace(b.servicioDesde)}` : ""}</>
+            : "Disponible para emergencias"}</span>
+          <ServicioBoton b={b} user={user} toast={toast} grande />
+        </div>
+        <AlarmasPush user={user} app="bolsos" />
+      </>}
     />
   );
 }
 
 /* ---------- List of bags = state of every bag ---------- */
-function Lista({ bolsos, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, toast }: {
-  bolsos: BolsoInst[]; gerencia: boolean; pendientes: number; chip: React.ReactNode; alarmas: React.ReactNode;
+function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, toast }: {
+  bolsos: BolsoInst[]; user: User; gerencia: boolean; pendientes: number; chip: React.ReactNode; alarmas: React.ReactNode;
   onOpen: (id: string) => void; onEquipo: () => void; toast: (m: string) => void;
 }) {
   const [nuevo, setNuevo] = useState(false);
@@ -201,13 +210,15 @@ function Lista({ bolsos, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, 
   const [cols, setCols] = useState<1 | 2>(1);
   useEffect(() => { try { if (localStorage.getItem("bolsos-columnas") === "2") setCols(2); } catch {} }, []);
   const elegirCols = (n: 1 | 2) => { setCols(n); try { localStorage.setItem("bolsos-columnas", String(n)); } catch {} };
-  const conFaltantes = datos.filter((x) => x.r.cargados && x.r.faltan).length;
-  const sinCargar = datos.filter((x) => !x.r.cargados).length;
+  const activos = datos.filter((x) => !x.b.fueraDeServicio);
+  const fueraN = datos.length - activos.length;
+  const conFaltantes = activos.filter((x) => x.r.cargados && x.r.faltan).length;
+  const sinCargar = activos.filter((x) => !x.r.cargados).length;
   // "complete" only when every item was checked and nothing is missing
-  const ok = datos.filter((x) => x.r.cargados === x.r.total && !x.r.faltan).length;
+  const ok = activos.filter((x) => x.r.cargados === x.r.total && !x.r.faltan).length;
 
   async function copiar() {
-    const txt = buildCopyTextVarios(bolsos.map((b) => ({ nombre: b.nombre, ubicacion: b.ubicacion, bolso: b.bolso })));
+    const txt = buildCopyTextVarios(bolsos.map((b) => ({ nombre: b.nombre, ubicacion: b.ubicacion, bolso: b.bolso, fueraDeServicio: b.fueraDeServicio })));
     try { await navigator.clipboard.writeText(txt); setCopyFallback(""); toast("Lista copiada"); }
     catch { setCopyFallback(txt); toast("Seleccioná y copiá el texto"); }
   }
@@ -219,10 +230,11 @@ function Lista({ bolsos, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, 
           <div className="titles"><h1>Bolsos</h1><span className="subtitle">{gerencia ? "Gerencia · estado de todos los bolsos" : "Bolsos de la institución"}</span></div>
           {chip}
         </div>
-        <div className="meter">
+        <div className={`meter ${fueraN ? "cuatro" : ""}`}>
           <div className="tile bad"><b className="num">{conFaltantes}</b><span>Con faltantes</span></div>
           <div className="tile ok"><b className="num">{ok}</b><span>Completos</span></div>
           <div className="tile"><b className="num">{sinCargar}</b><span>Sin cargar</span></div>
+          {fueraN > 0 && <div className="tile fuera"><b className="num">{fueraN}</b><span>Fuera de servicio</span></div>}
         </div>
         {alarmas}
       </header>
@@ -266,17 +278,27 @@ function Lista({ bolsos, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, 
           const dias = diasDesde(b.actualizado);
           const viejo = r.cargados > 0 && dias !== null && dias >= STALE_DAYS;
           const parcial = r.cargados > 0 && r.cargados < r.total;
-          const estado = !r.cargados ? "none" : r.faltan ? "bad" : r.atencion || parcial ? "warn" : "ok";
+          const fuera = b.fueraDeServicio;
+          const estado = fuera ? "fuera" : !r.cargados ? "none" : r.faltan ? "bad" : r.atencion || parcial ? "warn" : "ok";
           return (
             <li key={b.id}>
-              <button className={`bag ${estado}`} onClick={() => onOpen(b.id)}>
+              {/* the whole card opens the bag (stretched button); the service switch sits on top of it */}
+              <div className={`bag ${estado}`}>
                 <span className="bag-main">
                   <span className="bag-top">
-                    <span className="bag-name">{b.nombre}</span>
-                    {b.horario && <span className="bag-horario">{b.horario}</span>}
+                    <button className="bag-open bag-name" onClick={() => onOpen(b.id)}>{b.nombre}</button>
+                    <span className="bag-side">
+                      <ServicioBoton b={b} user={user} toast={toast} />
+                      {b.horario && <span className="bag-horario">{b.horario}</span>}
+                    </span>
                   </span>
                   {(b.direccion || b.ubicacion) && <span className="bag-where">{[b.direccion, b.ubicacion].filter(Boolean).join(" · ")}</span>}
                   {/* big, readable status: what a dispatcher needs in an emergency */}
+                  {fuera && (<>
+                    <span className="bag-estado fuera"><span className="bag-estado-icon" aria-hidden="true">⛔</span>Fuera de servicio</span>
+                    <span className="bag-when">No contar con este bolso{b.servicioDesde ? ` · desde ${hace(b.servicioDesde)}` : ""}{b.servicioPor ? ` · marcado por ${b.servicioPor}` : ""}</span>
+                  </>)}
+                  {!fuera && <>
                   {!r.cargados && <span className="bag-estado none">Sin cargar</span>}
                   {r.cargados > 0 && r.faltan > 0 && (
                     <span className="bag-estado bad"><span className="bag-estado-icon" aria-hidden="true">✕</span>{r.faltan === 1 ? "Falta 1 elemento" : `Faltan ${r.faltan} elementos`}</span>
@@ -297,9 +319,10 @@ function Lista({ bolsos, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, 
                     {viejo && <span className="pill warn">Sin revisar hace {dias} días</span>}
                   </span>
                   <span className="bag-when">{b.actualizado ? `Revisado ${hace(b.actualizado)}${b.por ? ` por ${b.por}` : ""}` : "Nadie lo revisó todavía"}</span>
+                  </>}
                 </span>
                 <span className="chev" aria-hidden="true">›</span>
-              </button>
+              </div>
             </li>
           );
         })}
@@ -337,6 +360,26 @@ function NuevoBolso({ bolsos, onDone, toast }: { bolsos: BolsoInst[]; onDone: (i
       </div>
       <div className="acts"><button className="btn primary" disabled={busy || !datos.nombre.trim()}>{busy ? "Creando…" : "Crear bolso"}</button></div>
     </form>
+  );
+}
+
+/** "En servicio" (green) ⇄ "Fuera de servicio" (red). Any team member can switch it; it is logged. */
+function ServicioBoton({ b, user, toast, grande }: { b: BolsoInst; user: User; toast: (m: string) => void; grande?: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const fuera = b.fueraDeServicio;
+  return (
+    <button
+      className={`servicio ${fuera ? "off" : "on"} ${grande ? "grande" : ""}`} aria-pressed={!fuera} disabled={busy}
+      aria-label={`${b.nombre}: ${fuera ? "fuera de servicio. Tocá para ponerlo en servicio" : "en servicio. Tocá para marcarlo fuera de servicio"}`}
+      onClick={async (e) => {
+        e.stopPropagation(); setBusy(true);
+        try { await cambiarServicio(b.id, !fuera, user); toast(`${b.nombre}: ${fuera ? "en servicio" : "fuera de servicio"}`); }
+        catch { toast("No se pudo cambiar. Revisá la conexión."); }
+        finally { setBusy(false); }
+      }}
+    >
+      <span className="servicio-dot" aria-hidden="true" />{fuera ? "Fuera de servicio" : "En servicio"}
+    </button>
   );
 }
 

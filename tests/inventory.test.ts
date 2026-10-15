@@ -115,3 +115,12 @@ test("list changes replay on another bag without touching its counts", async () 
   assert.equal(c.cant.ft5, 2);
   assert.ok(findItem(c, "fh-n"));
 });
+
+test("restocking text leaves out-of-service bags apart", async () => {
+  const { buildCopyTextVarios } = await import("../lib/inventory.ts");
+  const a = setCant(emptyBolso(), "ft7", 1)!.next;
+  const t = buildCopyTextVarios([{ nombre: "Sede", bolso: a }, { nombre: "Auto 2", bolso: a, fueraDeServicio: true }], new Date(2026, 9, 15));
+  assert.match(t, /\*Sede\*/);
+  assert.doesNotMatch(t, /\*Auto 2\*/);
+  assert.match(t, /Fuera de servicio: Auto 2/);
+});
