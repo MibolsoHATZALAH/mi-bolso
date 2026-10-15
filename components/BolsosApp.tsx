@@ -257,7 +257,7 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
   }
 
   return (
-    <div className="wrap">
+    <div className="wrap ancho">
       <header className="band">
         <div className="band-top">
           <div className="titles"><h1>Bolsos</h1><span className="subtitle">{gerencia ? "Gerencia · estado de todos los bolsos" : "Bolsos de la institución"}</span></div>

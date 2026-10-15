@@ -385,7 +385,6 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 .bags.dos .bag-estado.none{font-size:15px;padding-left:10px}
 .bags.dos .bag-estado-icon{width:22px;height:22px;font-size:13px}
 .bags.dos .bag-miss li{font-size:15px;padding:4px 0}
-.bags.dos .bag-miss-motivo{display:none}
 .bags.dos .bag-pills .pill{font-size:11px}
 .bags.dos .bag-when{font-size:12px}
 @media (min-width:700px){ .bags.dos .bag-estado{font-size:19px} .bags.dos .bag-name{font-size:19px} }
@@ -439,28 +438,62 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 .bag-barrio{align-self:flex-start;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--accent);margin-bottom:-2px}
 .t-corto{display:none}
 
-/* 4 per row: name, status and the service dot only */
+/* 4 per row: the SAME information as 1 per row (emergency use), only smaller type */
 .bags.cuatro{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .bags.cuatro > li{min-width:0;display:flex}
-.bags.cuatro .bag{padding:9px 8px;border-radius:14px;align-items:stretch;gap:0}
+.bags.cuatro .bag{padding:10px 9px;border-radius:16px;align-items:stretch;gap:0}
+.bags.cuatro .bag .chev{display:none}
 .bags.cuatro .bag-main{gap:5px}
 .bags.cuatro .bag-top{flex-direction:column;gap:5px}
-.bags.cuatro .bag-name{font-size:13px;line-height:1.15;letter-spacing:-.01em}
 .bags.cuatro .bag-side{align-items:flex-start;max-width:100%}
-.bags.cuatro .bag-barrio{font-size:9px}
-.bags.cuatro .servicio{padding:4px;gap:0}
-.bags.cuatro .servicio-txt,.bags.cuatro .bag-horario,.bags.cuatro .bag-where,.bags.cuatro .bag-miss,.bags.cuatro .bag-pills,
-.bags.cuatro .bag-when,.bags.cuatro .chev,.bags.cuatro .t-largo{display:none}
-.bags.cuatro .t-corto{display:inline}
-.bags.cuatro .bag-estado{font-size:12px;font-weight:800;padding:4px 7px 4px 4px;gap:4px;align-self:stretch;margin-top:auto;line-height:1.1}
-.bags.cuatro .bag-estado.none{font-size:11px;padding-left:7px}
-.bags.cuatro .bag-estado-icon{width:16px;height:16px;font-size:9px;flex:0 0 auto}
-@media (min-width:700px){
-  .bags.cuatro{gap:10px}
-  .bags.cuatro .bag{padding:12px}
-  .bags.cuatro .bag-name{font-size:16px}
-  .bags.cuatro .bag-estado{font-size:15px}
-  .bags.cuatro .bag-horario{display:inline-block;font-size:11px}
-  .bags.cuatro .servicio{padding:5px 9px 5px 7px;gap:6px}
-  .bags.cuatro .servicio-txt{display:inline;font-size:11px}
+.bags.cuatro .bag-name{font-size:14px;line-height:1.15;letter-spacing:-.01em}
+.bags.cuatro .bag-barrio{font-size:10px}
+.bags.cuatro .servicio{font-size:11px;padding:4px 8px 4px 6px;gap:5px;white-space:normal;text-align:left}
+.bags.cuatro .servicio-dot{width:8px;height:8px;flex:0 0 auto}
+.bags.cuatro .bag-horario{max-width:100%;text-align:left;font-size:11px;padding:2px 6px}
+.bags.cuatro .bag-where{font-size:12px;line-height:1.25}
+.bags.cuatro .bag-estado{font-size:13px;font-weight:800;padding:5px 8px 5px 5px;gap:5px;align-self:stretch;line-height:1.15}
+.bags.cuatro .bag-estado.none{font-size:12px;padding-left:8px}
+.bags.cuatro .bag-estado-icon{width:18px;height:18px;font-size:10px;flex:0 0 auto}
+.bags.cuatro .bag-miss{margin:2px 0 0}
+.bags.cuatro .bag-miss li{font-size:13px;padding:3px 0;flex-wrap:wrap;gap:0 6px;line-height:1.2}
+.bags.cuatro .bag-miss-motivo{font-size:11px}
+.bags.cuatro .bag-miss li.mas{font-size:12px}
+.bags.cuatro .bag-pills{gap:4px}
+.bags.cuatro .bag-pills .pill{font-size:10px;padding:2px 6px;white-space:normal}
+.bags.cuatro .bag-when{font-size:11px;line-height:1.25}
+@media (min-width:900px){
+  .bags.cuatro{gap:12px}
+  .bags.cuatro .bag{padding:14px}
+  .bags.cuatro .bag-name{font-size:19px}
+  .bags.cuatro .bag-barrio{font-size:12px}
+  .bags.cuatro .servicio{font-size:13px;padding:6px 11px 6px 9px}
+  .bags.cuatro .bag-horario{font-size:12px}
+  .bags.cuatro .bag-where{font-size:14px}
+  .bags.cuatro .bag-estado{font-size:18px;padding:6px 12px 6px 7px}
+  .bags.cuatro .bag-estado-icon{width:24px;height:24px;font-size:13px}
+  .bags.cuatro .bag-miss li{font-size:16px}
+  .bags.cuatro .bag-miss-motivo{font-size:13px}
+  .bags.cuatro .bag-pills .pill{font-size:12px}
+  .bags.cuatro .bag-when{font-size:12px}
 }
+
+/* 4 per row on a phone: nothing gets cut — text wraps inside rounded boxes */
+.bags.cuatro .bag-estado,.bags.cuatro .servicio{border-radius:10px}
+.bags.cuatro .bag-estado > span:not(.bag-estado-icon),.bags.cuatro .servicio-txt,.bags.cuatro .bag-name,.bags.cuatro .bag-miss li span{min-width:0;overflow-wrap:break-word;-webkit-hyphens:auto;hyphens:auto}
+@media (max-width:600px){
+  .bags.cuatro{gap:6px}
+  .bags.cuatro .bag{padding:8px 7px}
+  .bags.cuatro .bag-name{font-size:13px}
+  .bags.cuatro .bag-estado{font-size:12px;padding:5px 6px;justify-content:center;text-align:center}
+  .bags.cuatro .bag-estado-icon{display:none}
+  .bags.cuatro .servicio{font-size:10.5px;padding:4px 6px 4px 5px}
+  .bags.cuatro .bag-miss li{font-size:12px}
+  .bags.cuatro .bag-miss-motivo,.bags.cuatro .bag-when,.bags.cuatro .bag-horario{font-size:10.5px}
+  .bags.cuatro .bag-where{font-size:11px}
+}
+
+/* the list of shared bags uses the whole screen width */
+.wrap.ancho{max-width:none;padding-inline:max(10px,env(safe-area-inset-left,0px)) max(10px,env(safe-area-inset-right,0px))}
+.wrap.ancho .band{margin:0 -10px;padding-inline:10px}
+.wrap.ancho .chips{margin:0 -10px;padding-inline:10px}
