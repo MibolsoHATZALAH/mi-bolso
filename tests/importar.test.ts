@@ -49,6 +49,7 @@ test("the 13 bags loaded on 14/10 at night: nothing is duplicated or mixed up", 
   assert.deepEqual(de("Bolso Yeshurun Primaria"), { barrio: "Palermo", horario: "9 a 17" });
   assert.equal(de("Bolso Yeshurun Templo").direccion, "República de la India 3035");
   assert.equal(de("Bolso Hejal Hatora").direccion, "Ecuador 936");
-  assert.equal(p.completar.length, 12);
-  assert.equal(p.crear.length, 27); // 38 places − 11 already loaded ("Base Flores" is not matched to anything)
+  assert.equal(p.completar.length, 13);
+  assert.equal(p.crear.length, 26); // 38 places − 12 already loaded ("Base Flores" = Central Flores)
+  assert.deepEqual(de("Base Flores"), { barrio: "Flores", direccion: "Artigas 626", horario: "24 hs" });
 });

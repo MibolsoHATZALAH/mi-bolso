@@ -153,7 +153,11 @@
       "barrio": "Flores",
       "nombre": "Central Flores",
       "direccion": "Artigas 626",
-      "horario": "24 hs"
+      "horario": "24 hs",
+      "existente": [
+        "base flores",
+        "central flores"
+      ]
     },
     {
       "barrio": "Flores",
