@@ -288,7 +288,20 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 .bag-name{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:-.02em;line-height:1.15;overflow-wrap:anywhere}
 .bag-where{font-size:15px;color:var(--muted)}
 .bag-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
-.bag-miss{font-size:13px;color:var(--bad)}
+/* status of a shared bag: large on purpose, read at a glance during an emergency */
+.bag-estado{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;margin-top:4px;padding:6px 14px 6px 8px;border-radius:999px;
+  font-family:var(--f-display);font-size:21px;font-weight:800;letter-spacing:-.015em;line-height:1.15}
+.bag-estado.bad{background:var(--bad);color:#fff;box-shadow:0 6px 16px color-mix(in srgb,var(--bad) 35%,transparent)}
+.bag-estado.ok{background:var(--ok);color:#fff;box-shadow:0 6px 16px color-mix(in srgb,var(--ok) 30%,transparent)}
+.bag-estado.warn{background:var(--orange);color:#fff;box-shadow:0 6px 16px color-mix(in srgb,var(--orange) 30%,transparent)}
+.bag-estado.none{background:var(--fill);color:var(--muted);padding-left:14px;font-size:18px;font-weight:700}
+.bag-estado-icon{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.25);display:grid;place-items:center;font-size:17px}
+.bag-miss{list-style:none;margin:6px 0 2px;padding:0;display:flex;flex-direction:column}
+.bag-miss li{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 0;border-bottom:.5px solid var(--line);
+  font-size:18px;font-weight:600;color:var(--bad)}
+.bag-miss li:last-child{border-bottom:0}
+.bag-miss-motivo{flex:0 0 auto;font-size:14px;font-weight:600;opacity:.85}
+.bag-miss li.mas{font-size:15px;color:var(--muted);font-weight:500}
 .bag-when{font-size:13px;color:var(--muted)}
 .chev{font-size:26px;color:var(--faint);line-height:1}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px}
@@ -339,3 +352,10 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 @media (prefers-reduced-transparency:reduce){
   :root{--glass:var(--glass-strong)}
 }
+
+/* inside a shared bag: the missing-items card is larger too */
+.tema-bolsos .summary h2{font-size:27px}
+.tema-bolsos .summary .sum-list li{font-size:19px;font-weight:600;padding:10px 0}
+.tema-bolsos .summary .sum-list .where{font-size:14px;font-weight:400}
+.tema-bolsos .summary .sum-list .pill{font-size:14px;padding:4px 11px}
+.tema-bolsos .summary .sum-group h3{font-size:14px}

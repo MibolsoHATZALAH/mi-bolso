@@ -193,7 +193,8 @@ function Lista({ bolsos, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, 
   const datos = useMemo(() => bolsos.map((b) => ({ b, r: resumen(b.bolso), av: alertasVenc(b.bolso) })), [bolsos]);
   const conFaltantes = datos.filter((x) => x.r.cargados && x.r.faltan).length;
   const sinCargar = datos.filter((x) => !x.r.cargados).length;
-  const ok = datos.filter((x) => x.r.cargados && !x.r.faltan).length;
+  // "complete" only when every item was checked and nothing is missing
+  const ok = datos.filter((x) => x.r.cargados === x.r.total && !x.r.faltan).length;
 
   async function copiar() {
     const txt = buildCopyTextVarios(bolsos.map((b) => ({ nombre: b.nombre, ubicacion: b.ubicacion, bolso: b.bolso })));
@@ -241,26 +242,34 @@ function Lista({ bolsos, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, 
         {datos.map(({ b, r, av }) => {
           const dias = diasDesde(b.actualizado);
           const viejo = r.cargados > 0 && dias !== null && dias >= STALE_DAYS;
-          const estado = !r.cargados ? "none" : r.faltan ? "bad" : r.atencion ? "warn" : "ok";
+          const parcial = r.cargados > 0 && r.cargados < r.total;
+          const estado = !r.cargados ? "none" : r.faltan ? "bad" : r.atencion || parcial ? "warn" : "ok";
           return (
             <li key={b.id}>
               <button className={`bag ${estado}`} onClick={() => onOpen(b.id)}>
                 <span className="bag-main">
                   <span className="bag-name">{b.nombre}</span>
                   {b.ubicacion && <span className="bag-where">{b.ubicacion}</span>}
+                  {/* big, readable status: what a dispatcher needs in an emergency */}
+                  {!r.cargados && <span className="bag-estado none">Sin cargar</span>}
+                  {r.cargados > 0 && r.faltan > 0 && (
+                    <span className="bag-estado bad"><span className="bag-estado-icon" aria-hidden="true">✕</span>{r.faltan === 1 ? "Falta 1 elemento" : `Faltan ${r.faltan} elementos`}</span>
+                  )}
+                  {r.cargados > 0 && !r.faltan && !parcial && <span className="bag-estado ok"><span className="bag-estado-icon" aria-hidden="true">✓</span>Completo</span>}
+                  {!r.faltan && parcial && <span className="bag-estado warn"><span className="bag-estado-icon" aria-hidden="true">!</span>Revisado {r.cargados} de {r.total}</span>}
+                  {r.faltan > 0 && (
+                    <ul className="bag-miss">
+                      {r.bad.slice(0, 6).map((x) => <li key={x.it.id}><span>{x.it.nombre}</span><span className="bag-miss-motivo">{x.st.motivo}</span></li>)}
+                      {r.faltan > 6 && <li className="mas">y {r.faltan - 6} más</li>}
+                    </ul>
+                  )}
                   <span className="bag-pills">
-                    {!r.cargados && <span className="pill none">Sin cargar</span>}
-                    {r.cargados > 0 && r.faltan > 0 && <span className="pill bad">{r.faltan === 1 ? "1 faltante" : `${r.faltan} faltantes`}</span>}
-                    {r.cargados > 0 && !r.faltan && <span className="pill ok">Completo</span>}
                     {av.some((a) => a.dias < 0) && <span className="pill bad">{av.filter((a) => a.dias < 0).length} vencido{av.filter((a) => a.dias < 0).length > 1 ? "s" : ""}</span>}
                     {av.some((a) => a.dias >= 0) && <span className="pill warn">{av.filter((a) => a.dias >= 0).length} por vencer</span>}
                     {r.atencion > 0 && <span className="pill warn">{r.atencion} atención</span>}
-                    {r.cargados > 0 && r.cargados < r.total && <span className="pill info">{r.cargados}/{r.total} cargados</span>}
+                    {r.faltan > 0 && parcial && <span className="pill warn">Revisado {r.cargados} de {r.total}</span>}
                     {viejo && <span className="pill warn">Sin revisar hace {dias} días</span>}
                   </span>
-                  {gerencia && r.faltan > 0 && (
-                    <span className="bag-miss">{r.bad.slice(0, 4).map((x) => x.it.nombre).join(" · ")}{r.faltan > 4 ? ` · y ${r.faltan - 4} más` : ""}</span>
-                  )}
                   <span className="bag-when">{b.actualizado ? `Revisado ${hace(b.actualizado)}${b.por ? ` por ${b.por}` : ""}` : "Nadie lo revisó todavía"}</span>
                 </span>
                 <span className="chev" aria-hidden="true">›</span>
