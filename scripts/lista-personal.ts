@@ -23,6 +23,20 @@ const items = lista.secciones.flatMap((s) => s.categorias.flatMap((c) => c.items
 console.log(`Lista del equipo: ${items} elementos, la usan ${iguales} de ${catalogs.length} bolsos.`);
 for (const s of lista.secciones) console.log(`  ${s.nombre}: ${s.categorias.map((c) => `${c.nombre} (${c.items.length})`).join(", ")}`);
 
+// how the bags' lists differ from each other (they should all share one)
+const desc = (c: Catalog) => new Map(c.secciones.flatMap((s) => s.categorias.flatMap((x) => x.items.map((it) => [it.id, `${s.id}/${x.id}/${x.nombre}${x.vence ? "(vence)" : ""}: ${it.nombre} [${it.tipo}${it.min != null ? ` min ${it.min}` : ""}${it.vital != null ? ` vital=${it.vital}` : ""}]`] as const))));
+const ref = desc(lista);
+for (const d of snap.docs.sort((a, b) => String(a.data().nombre).localeCompare(String(b.data().nombre), "es"))) {
+  const c = d.data().catalog as Catalog | undefined; if (!c?.secciones) { console.log(`  · ${d.data().nombre}: sin lista`); continue; }
+  const m = desc(c), dif: string[] = [];
+  for (const [id, t] of m) if (!ref.has(id)) dif.push(`+ ${t}`); else if (ref.get(id) !== t) dif.push(`~ ${t}  (lista: ${ref.get(id)})`);
+  for (const [id, t] of ref) if (!m.has(id)) dif.push(`- ${t}`);
+  const orden = [...m.keys()].join() !== [...ref.keys()].filter((k) => m.has(k)).join() ? " (otro orden)" : "";
+  console.log(`  ${d.data().nombre}: ${m.size} elementos${dif.length ? ` · ${dif.length} diferencias` : mismaLista(c, lista) ? " · igual" : " · mismos elementos, distinto formato"}${orden}`);
+  for (const x of dif.slice(0, 12)) console.log(`      ${x}`);
+}
+if (process.argv.includes("--solo-ver")) process.exit(0);
+
 const users = await db.collection("users").get();
 for (const email of emails) {
   const u = users.docs.find((d) => String(d.data().email ?? "").toLowerCase() === email);
