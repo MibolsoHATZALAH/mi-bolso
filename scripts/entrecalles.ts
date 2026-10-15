@@ -16,12 +16,45 @@ type Feature = { properties: Record<string, unknown>; geometry: Geo | null };
 
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\bAV(ENIDA)?\b\.?/g, "").replace(/[^A-Z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 const PEQ = new Set(["de", "del", "la", "las", "los", "y", "e", "el"]);
+// the City's map writes names without accents
+const ACENTOS: Record<string, string> = Object.fromEntries(
+  ("Córdoba Tucumán Morón Pueyrredón Azcuénaga Agüero Seguí Concepción Católica República Amenábar Gómez Valentín Jaurès José Tomás María " +
+   "Junín Díaz Vélez Güemes México Perú Álvarez Gutiérrez Rodríguez Fernández González Martínez Pérez Sánchez López García Ramón Bolívar " +
+   "Echeverría Galván Núñez Añasco Gascón Aráoz Olazábal Iberá Sáenz Maipú Paraná Andrés Lambaré Ángel Belén Darwin Guzmán Hernández " +
+   "Jiménez Martín Medrano Muñiz Nicolás Ramírez Sarmiento Tomás Ávila Sánchez Ayacucho Alcorta Cerviño Ecuador Larrea Viamonte " +
+   "Agustín Joaquín Julián Sebastián Lucía Inés Ríos Zuviría Méndez Juárez Castañeda Ocampo Bustamante Peña Mitre Varela Catamarca Jujuy")
+    .split(/\s+/).map((w) => [w.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(), w]),
+);
+const TITULOS = /(^|\s)(pres|presidente|gral|general|dr|doctor|ing|cnel|coronel|tte|teniente|pte|cap|capitan|almte|almirante|mons|gdor|int|pbro|cmte|comodoro|sgto|brig|mcal|mariscal|cdte|prof|arq)\.?(?=\s|$)/g;
 function lindo(nombre: string) {
-  let s = nombre.toLowerCase().replace(/\s+/g, " ").trim();
+  let s = nombre.toLowerCase().replace(/\./g, ". ").replace(/\s+/g, " ").trim();
   let av = false;
-  s = s.replace(/(^|\s)av(enida)?\.?(?=\s|$)/g, () => { av = true; return " "; }).trim();
-  s = s.split(" ").map((w, i) => (i > 0 && PEQ.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1))).join(" ");
+  s = s.replace(/(^|\s)av(enida)?\.?(?=\s|$)/g, () => { av = true; return " "; }).replace(TITULOS, " ").replace(/\s+/g, " ").trim();
+  s = s.split(" ").map((w, i) => {
+    if (i > 0 && PEQ.has(w)) return w;
+    const k = w.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    return ACENTOS[k] ?? w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(" ");
   return (av ? "Av. " : "") + s;
+}
+// Short everyday name: "ANCHORENA, TOMAS MANUEL DE, DR." → "Anchorena"; "GOMEZ, VALENTIN" → "Valentín Gómez" (one given name is kept)
+function nombreCorto(p: Record<string, unknown>) {
+  const mapa = String(prop(p, "nom_mapa") ?? ""), ofi = String(prop(p, "nomoficial", "nom_oficial", "nombre") ?? "");
+  const av = /(^|[\s.])av(enida)?\b/i.test(mapa) || /(^|[\s.,])av(enida)?\b/i.test(ofi) ? "Av. " : "";
+  const partes = ofi.split(",").map((x) => x.replace(/\bav(enida)?\b\.?/gi, " ").trim()).filter(Boolean);
+  if (partes.length >= 2) {
+    const apellido = lindo(partes[0]), nombres = lindo(partes[1]);
+    const unNombre = nombres && !/\./.test(partes[1]) && nombres.split(" ").length === 1 && !/^(Av\.)/.test(nombres);
+    return av + (unNombre ? `${nombres} ${apellido}` : apellido);
+  }
+  const l = lindo(mapa || ofi);
+  return l.startsWith("Av. ") ? l : av + l;
+}
+// a few streets everybody calls by more than the surname
+const CONOCIDAS: Record<string, string> = { "Paz": "General Paz", "Díaz": "Coronel Díaz", "Justo": "Juan B. Justo", "Alberdi": "Juan B. Alberdi", "Alem": "Leandro N. Alem", "Rawson": "Guillermo Rawson" };
+function nombreCalle(p: Record<string, unknown>) {
+  const n = nombreCorto(p), av = n.startsWith("Av. ") ? "Av. " : "", base = n.replace(/^Av\. /, "");
+  return CONOCIDAS[base] ? av + CONOCIDAS[base] : n;
 }
 const prop = (p: Record<string, unknown>, ...ks: string[]) => {
   for (const k of ks) for (const kk of Object.keys(p)) if (kk.toLowerCase() === k) return p[kk];
@@ -82,16 +115,20 @@ tramos.forEach((f, i) => {
 });
 function callesEn(punto: number[], excluir: (p: Record<string, unknown>) => boolean) {
   const [x, y] = [Math.round(punto[0] * 10000), Math.round(punto[1] * 10000)];
-  const out = new Set<string>();
+  const cuenta = new Map<string, number>(); // name → blocks touching this corner (2 = the street goes through)
   for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
     for (const i of indice.get(`${x + dx},${y + dy}`) ?? []) {
       const t = tramos[i], e = extremos(t.geometry)!;
       if (excluir(t.properties)) continue;
       if (Math.min(metros(e[0], punto), metros(e[1], punto)) > 8) continue;
-      const n = nombreTramo(t.properties); if (n) out.add(lindo(n));
+      const n = nombreCalle(t.properties); if (n) cuenta.set(n, (cuenta.get(n) ?? 0) + 1);
     }
   }
-  return [...out];
+  // a street that goes through the corner beats one that just ends there; an avenue beats both
+  let xs = [...cuenta.keys()];
+  if (xs.some((n) => n.startsWith("Av. "))) xs = xs.filter((n) => n.startsWith("Av. "));
+  const max = Math.max(0, ...xs.map((n) => cuenta.get(n)!));
+  return xs.filter((n) => cuenta.get(n) === max);
 }
 
 // ---------- address → block → cross streets ----------
@@ -123,7 +160,7 @@ async function entrecalles(direccion: string): Promise<Resultado> {
   const [bajo, alto] = ordenNormal ? [desdeIni, desdeFin] : [desdeFin, desdeIni];
   if (!bajo.length && !alto.length) return { ok: false, motivo: "no se encontraron calles que crucen" };
   const lado = (xs: string[]) => (xs.length ? xs.join(" / ") : "—");
-  return { ok: true, texto: `entre ${lado(bajo)} y ${lado(alto)}`, calle: lindo(nombreTramo(cuadra.properties) || d.nombre_calle), altura };
+  return { ok: true, texto: `entre ${lado(bajo)} y ${lado(alto)}`, calle: nombreCalle(cuadra.properties) || lindo(d.nombre_calle), altura };
 }
 
 // ---------- bags ----------
