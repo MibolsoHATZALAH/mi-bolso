@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --test --experimental-strip-types tests/inventory.test.ts tests/alarmas.test.ts tests/importar.test.ts",
+    "test": "node --test --experimental-strip-types tests/inventory.test.ts tests/alarmas.test.ts tests/importar.test.ts tests/horario.test.ts",
     "alarmas": "node --experimental-strip-types scripts/alarmas.ts"
   },
   "dependencies": {

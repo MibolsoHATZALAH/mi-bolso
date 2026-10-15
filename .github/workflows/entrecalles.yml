@@ -1,0 +1,35 @@
+# Cross streets for every shared bag, from the City's official street map. Actions → "Entrecalles" → Run workflow.
+name: Entrecalles
+
+on:
+  workflow_dispatch:
+    inputs:
+      prueba:
+        description: "Sólo mostrar, sin guardar"
+        type: boolean
+        default: true
+      reemplazar:
+        description: "Reemplazar también las que ya se cargaron a mano"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency: entrecalles
+
+jobs:
+  entrecalles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Calcular entrecalles
+        run: node --experimental-strip-types scripts/entrecalles.ts ${{ !inputs.prueba && '--guardar' || '' }} ${{ inputs.reemplazar && '--reemplazar' || '' }}
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
