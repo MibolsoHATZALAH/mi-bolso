@@ -46,10 +46,30 @@ const res = await fetch(CALLEJERO, { redirect: "follow" });
 if (!res.ok) throw new Error(`callejero: HTTP ${res.status}`);
 const gj = (await res.json()) as { features: Feature[] };
 const tramos = gj.features.filter((f) => f.geometry);
-console.log(`Callejero: ${tramos.length} cuadras. Campos: ${Object.keys(tramos[0].properties).join(", ")}`);
+console.log(`Callejero: ${tramos.length} cuadras. Ejemplos: ${tramos.slice(0, 4).map((t) => `${prop(t.properties, "nomoficial")} → ${prop(t.properties, "nom_mapa")}`).join(" | ")}`);
+
+// all street names in the map, to recover typos ("Bologne Sur Mer" → "BOULOGNE SUR MER")
+const lev = (a: string, b: string) => {
+  const d = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) { let prev = d[0]; d[0] = i;
+    for (let j = 1; j <= b.length; j++) { const t = d[j]; d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = t; } }
+  return d[b.length];
+};
+const nombresCalles = new Map<string, string>(); // normalized → code
+for (const t of tramos) {
+  const c = String(prop(t.properties, "codigo") ?? "");
+  for (const n of [prop(t.properties, "nom_mapa"), String(prop(t.properties, "nomoficial") ?? "").split(",")[0]]) if (n) nombresCalles.set(norm(String(n)), c);
+}
+function corregirCalle(calle: string) {
+  const n = norm(calle); if (nombresCalles.has(n)) return null;
+  let mejor = "", dist = 99;
+  for (const k of nombresCalles.keys()) { const x = lev(n, k); if (x < dist) { dist = x; mejor = k; } }
+  return dist <= Math.max(1, Math.floor(n.length / 6)) ? mejor : null;
+}
 
 const codigo = (p: Record<string, unknown>) => String(prop(p, "codigo", "cod_calle", "id_calle") ?? "");
-const nombreTramo = (p: Record<string, unknown>) => String(prop(p, "nomoficial", "nom_oficial", "nombre", "nom_mapa") ?? "");
+// the short name printed on the City map ("AGUERO", "AV. CORDOBA") reads better than the cadastral one
+const nombreTramo = (p: Record<string, unknown>) => String(prop(p, "nom_mapa") || prop(p, "nomoficial", "nom_oficial", "nombre") || "");
 const alturas = (p: Record<string, unknown>) =>
   ["alt_izqini", "alt_izqfin", "alt_derini", "alt_derfin"].map((k) => num(prop(p, k))).filter((n) => Number.isFinite(n) && n > 0);
 
@@ -77,13 +97,17 @@ function callesEn(punto: number[], excluir: (p: Record<string, unknown>) => bool
 // ---------- address → block → cross streets ----------
 type Resultado = { ok: true; texto: string; calle: string; altura: number } | { ok: false; motivo: string };
 async function entrecalles(direccion: string): Promise<Resultado> {
-  const m = direccion.match(/^(.*?\d+)/); // drop "Piso 3", "1A", "/950"…
+  const m = direccion.match(/^(.*?)\s*(\d+)/); // drop "Piso 3", "1A", "/950"…
   if (!m) return { ok: false, motivo: "sin número de calle" };
-  const url = `${USIG}?direccion=${encodeURIComponent(m[1])}&geocodificar=TRUE&maxOptions=10`;
-  const r = await fetch(url);
-  if (!r.ok) return { ok: false, motivo: `normalizador HTTP ${r.status}` };
-  const j = (await r.json()) as { direccionesNormalizadas?: { cod_calle?: number | string; nombre_calle: string; altura: number | string; cod_partido?: string; nombre_partido?: string }[]; errorMessage?: string };
-  const d = (j.direccionesNormalizadas ?? []).find((x) => (x.cod_partido ?? "").toLowerCase() === "caba" || /ciudad/i.test(x.nombre_partido ?? ""));
+  type J = { direccionesNormalizadas?: { cod_calle?: number | string; nombre_calle: string; altura: number | string; cod_partido?: string; nombre_partido?: string }[]; errorMessage?: string };
+  const buscar = async (calle: string) => {
+    const r = await fetch(`${USIG}?direccion=${encodeURIComponent(`${calle} ${m[2]}`)}&geocodificar=TRUE&maxOptions=10`);
+    if (!r.ok) throw new Error(`normalizador HTTP ${r.status}`);
+    const j = (await r.json()) as J;
+    return { j, d: (j.direccionesNormalizadas ?? []).find((x) => (x.cod_partido ?? "").toLowerCase() === "caba" || /ciudad/i.test(x.nombre_partido ?? "")) };
+  };
+  let { j, d } = await buscar(m[1]);
+  if (!d) { const c = corregirCalle(m[1]); if (c) ({ j, d } = await buscar(c)); }
   if (!d) return { ok: false, motivo: j.errorMessage ? `no encontrada (${j.errorMessage})` : "no está en la Ciudad" };
   const altura = Number(d.altura), cod = String(d.cod_calle ?? ""), nom = norm(d.nombre_calle);
   const mismaCalle = (p: Record<string, unknown>) => (cod && codigo(p) ? codigo(p) === cod : norm(nombreTramo(p)) === nom);
@@ -99,7 +123,7 @@ async function entrecalles(direccion: string): Promise<Resultado> {
   const [bajo, alto] = ordenNormal ? [desdeIni, desdeFin] : [desdeFin, desdeIni];
   if (!bajo.length && !alto.length) return { ok: false, motivo: "no se encontraron calles que crucen" };
   const lado = (xs: string[]) => (xs.length ? xs.join(" / ") : "—");
-  return { ok: true, texto: `entre ${lado(bajo)} y ${lado(alto)}`, calle: lindo(d.nombre_calle), altura, ...{ rango: `${Math.min(...a)}-${Math.max(...a)}` } };
+  return { ok: true, texto: `entre ${lado(bajo)} y ${lado(alto)}`, calle: lindo(nombreTramo(cuadra.properties) || d.nombre_calle), altura };
 }
 
 // ---------- bags ----------
