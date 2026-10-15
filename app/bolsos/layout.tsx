@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function BolsosLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <div className="tema-bolsos">{children}</div>;
 }
