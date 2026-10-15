@@ -1,51 +1,263 @@
 {
   "fuente": "Planilla de bolsos de la institución (foto), revisada por Uriel el 14/10/2026",
   "bolsos": [
-    { "barrio": "Congreso", "nombre": "Tiferet Zekenim", "direccion": "Moreno 1850 Piso 3", "horario": "Lunes a Jueves 9 a 17 hs" },
-
-    { "barrio": "Once", "nombre": "Beit Jabad Central", "direccion": "Agüero 1164", "horario": "24 hs" },
-    { "barrio": "Once", "nombre": "Toratenu", "direccion": "Anchorena 719", "horario": "L a J de 7 a 22 y V de 7 a 16" },
-    { "barrio": "Once", "nombre": "Akedat Itzjak", "direccion": "Anchorena 829", "horario": "L a D de 8 a 12 y 19 a 20" },
-    { "barrio": "Once", "nombre": "Casa H18", "direccion": "Av. Córdoba 2911 1A", "horario": "24 hs" },
-    { "barrio": "Once", "nombre": "Pueyrredón 950", "direccion": "Av. Pueyrredón 946/950", "horario": "24 hs" },
-    { "barrio": "Once", "nombre": "Beit Jabad Billinghurst", "direccion": "Billinghurst 664", "horario": "L a V 7 a 23, S 8 a 21 y D 8 a 12 y 16 a 21" },
-    { "barrio": "Once", "nombre": "Beit Jabad BSM", "direccion": "Bologne Sur Mer 626", "horario": "L a D de 8 a 21 hs" },
-    { "barrio": "Once", "nombre": "Torat Moshe", "direccion": "Bologne Sur Mer 873", "horario": "8 a 20 hs" },
-    { "barrio": "Once", "nombre": "Shuba Israel", "direccion": "Ecuador 649", "horario": "L a D de 7 a 20" },
-    { "barrio": "Once", "nombre": "Kolel Jabad", "direccion": "Ecuador 850", "horario": "A confirmar", "existente": ["colel ecuador", "kolel jabad"] },
-    { "barrio": "Once", "nombre": "Heijal Hatorah", "direccion": "Ecuador 936", "horario": "A confirmar" },
-    { "barrio": "Once", "nombre": "Congregación Sefaradí", "direccion": "Lavalle 2449", "horario": "L a L de 6 a 22 hs", "existente": ["templo lavalle", "congregacion sefaradi"] },
-    { "barrio": "Once", "nombre": "Shaare Tefila", "direccion": "Paso 733", "horario": "L a D de 7 a 21" },
-    { "barrio": "Once", "nombre": "Local H63", "direccion": "Tucumán 2651", "horario": "L a J de 10 a 18:30, V de 10 a 16" },
-    { "barrio": "Once", "nombre": "Sucath David", "direccion": "Tucumán 2750", "horario": "6 a 22", "existente": ["sucat david", "sucath david"] },
-    { "barrio": "Once", "nombre": "Beit Jabad Jardín", "direccion": "Jean Jaurès 361", "horario": "L a V de 9:30 a 17 hs" },
-    { "barrio": "Once", "nombre": "Oholey Jinuj", "direccion": "San Luis 3168", "horario": "L a J 7:30 a 18 hs" },
-    { "barrio": "Once", "nombre": "Base Once", "direccion": "Bologne Sur Mer 647", "horario": "D a V hasta 16 hs", "existente": ["base once"] },
-    { "barrio": "Once", "nombre": "Ambulancia Once", "direccion": "Bologne Sur Mer 647", "horario": "D a V hasta 16 hs" },
-    { "barrio": "Once", "nombre": "Local H79", "direccion": "Av. Pueyrredón 786", "horario": "L a J 09:30 a 19:00 hs" },
-
-    { "barrio": "Flores", "nombre": "Central Flores", "direccion": "Artigas 626", "horario": "24 hs" },
-    { "barrio": "Flores", "nombre": "Agudat Dodim", "direccion": "Avellaneda 2874", "horario": "A confirmar" },
-    { "barrio": "Flores", "nombre": "Yeshiba Jajam Nisim", "direccion": "Felipe Vallese 2953", "horario": "L a L de 6 a 23 hs" },
-    { "barrio": "Flores", "nombre": "Shaare Sion", "direccion": "Helguera 465", "horario": "L a D de 7 a 20" },
-
-    { "barrio": "Palermo", "nombre": "Menora Safra Center", "direccion": "Las Heras 3337", "horario": "8 a 20" },
-    { "barrio": "Palermo", "nombre": "Yeshurun", "direccion": "República de la India 3035", "horario": "A confirmar" },
-    { "barrio": "Palermo", "nombre": "Primaria Ieshurun", "direccion": "", "horario": "9 a 17" },
-
-    { "barrio": "Belgrano", "nombre": "Ajdut Israel", "direccion": "Moldes 2449", "horario": "L a D de 7 a 21" },
-    { "barrio": "Belgrano", "nombre": "Chalom", "direccion": "Olleros 2876", "horario": "" },
-    { "barrio": "Belgrano", "nombre": "Club Casa", "direccion": "Figueroa Alcorta 7101", "horario": "" },
-    { "barrio": "Belgrano", "nombre": "Wolfsohn Primaria", "direccion": "Amenábar 2972", "horario": "" },
-
-    { "barrio": "Barracas", "nombre": "Or Torah", "direccion": "Brandsen 1444", "horario": "6:30 a 21" },
-
-    { "barrio": "Paternal", "nombre": "Local H61/H79", "direccion": "Maturín 2729", "horario": "L a J de 9 a 17, V de 9 a 16" },
-
-    { "barrio": "Villa Crespo / Chacarita", "nombre": "Wolfsohn Secundario", "direccion": "Rosetti 50", "horario": "" },
-
-    { "barrio": "Otros", "nombre": "Country Círculo", "direccion": "Ezeiza", "horario": "24 hs" },
-    { "barrio": "Otros", "nombre": "Cementerio AISA", "direccion": "Ciudadela", "horario": "A confirmar" },
-    { "barrio": "Otros", "nombre": "Miramar – Hotel Hamakom", "direccion": "", "horario": "24 hs en temporada" }
+    {
+      "barrio": "Congreso",
+      "nombre": "Tiferet Zekenim",
+      "direccion": "Moreno 1850 Piso 3",
+      "horario": "Lunes a Jueves 9 a 17 hs"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Beit Jabad Central",
+      "direccion": "Agüero 1164",
+      "horario": "24 hs"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Toratenu",
+      "direccion": "Anchorena 719",
+      "horario": "L a J de 7 a 22 y V de 7 a 16"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Akedat Itzjak",
+      "direccion": "Anchorena 829",
+      "horario": "L a D de 8 a 12 y 19 a 20"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Casa H18",
+      "direccion": "Av. Córdoba 2911 1A",
+      "horario": "24 hs"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Pueyrredón 950",
+      "direccion": "Av. Pueyrredón 946/950",
+      "horario": "24 hs"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Beit Jabad Billinghurst",
+      "direccion": "Billinghurst 664",
+      "horario": "L a V 7 a 23, S 8 a 21 y D 8 a 12 y 16 a 21"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Beit Jabad BSM",
+      "direccion": "Bologne Sur Mer 626",
+      "horario": "L a D de 8 a 21 hs"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Torat Moshe",
+      "direccion": "Bologne Sur Mer 873",
+      "horario": "8 a 20 hs"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Shuba Israel",
+      "direccion": "Ecuador 649",
+      "horario": "L a D de 7 a 20"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Kolel Jabad",
+      "direccion": "Ecuador 850",
+      "horario": "A confirmar",
+      "existente": [
+        "colel ecuador",
+        "kolel jabad"
+      ]
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Heijal Hatorah",
+      "direccion": "Ecuador 936",
+      "horario": "A confirmar",
+      "existente": [
+        "hejal hatora",
+        "heijal hatorah"
+      ]
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Congregación Sefaradí",
+      "direccion": "Lavalle 2449",
+      "horario": "L a L de 6 a 22 hs",
+      "existente": [
+        "templo lavalle",
+        "congregacion sefaradi"
+      ]
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Shaare Tefila",
+      "direccion": "Paso 733",
+      "horario": "L a D de 7 a 21",
+      "existente": [
+        "shaare tefila"
+      ]
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Local H63",
+      "direccion": "Tucumán 2651",
+      "horario": "L a J de 10 a 18:30, V de 10 a 16"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Sucath David",
+      "direccion": "Tucumán 2750",
+      "horario": "6 a 22",
+      "existente": [
+        "sucat david",
+        "sucath david"
+      ]
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Beit Jabad Jardín",
+      "direccion": "Jean Jaurès 361",
+      "horario": "L a V de 9:30 a 17 hs"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Oholey Jinuj",
+      "direccion": "San Luis 3168",
+      "horario": "L a J 7:30 a 18 hs"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Base Once",
+      "direccion": "Bologne Sur Mer 647",
+      "horario": "D a V hasta 16 hs",
+      "existente": [
+        "base once"
+      ]
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Ambulancia Once",
+      "direccion": "Bologne Sur Mer 647",
+      "horario": "D a V hasta 16 hs"
+    },
+    {
+      "barrio": "Once",
+      "nombre": "Local H79",
+      "direccion": "Av. Pueyrredón 786",
+      "horario": "L a J 09:30 a 19:00 hs"
+    },
+    {
+      "barrio": "Flores",
+      "nombre": "Central Flores",
+      "direccion": "Artigas 626",
+      "horario": "24 hs"
+    },
+    {
+      "barrio": "Flores",
+      "nombre": "Agudat Dodim",
+      "direccion": "Avellaneda 2874",
+      "horario": "A confirmar"
+    },
+    {
+      "barrio": "Flores",
+      "nombre": "Yeshiba Jajam Nisim",
+      "direccion": "Felipe Vallese 2953",
+      "horario": "L a L de 6 a 23 hs"
+    },
+    {
+      "barrio": "Flores",
+      "nombre": "Shaare Sion",
+      "direccion": "Helguera 465",
+      "horario": "L a D de 7 a 20"
+    },
+    {
+      "barrio": "Palermo",
+      "nombre": "Menora Safra Center",
+      "direccion": "Las Heras 3337",
+      "horario": "8 a 20"
+    },
+    {
+      "barrio": "Palermo",
+      "nombre": "Yeshurun",
+      "direccion": "República de la India 3035",
+      "horario": "A confirmar",
+      "existente": [
+        "yeshurun templo"
+      ]
+    },
+    {
+      "barrio": "Palermo",
+      "nombre": "Primaria Ieshurun",
+      "direccion": "",
+      "horario": "9 a 17",
+      "existente": [
+        "yeshurun primaria",
+        "primaria ieshurun",
+        "primaria yeshurun"
+      ]
+    },
+    {
+      "barrio": "Belgrano",
+      "nombre": "Ajdut Israel",
+      "direccion": "Moldes 2449",
+      "horario": "L a D de 7 a 21"
+    },
+    {
+      "barrio": "Belgrano",
+      "nombre": "Chalom",
+      "direccion": "Olleros 2876",
+      "horario": ""
+    },
+    {
+      "barrio": "Belgrano",
+      "nombre": "Club Casa",
+      "direccion": "Figueroa Alcorta 7101",
+      "horario": ""
+    },
+    {
+      "barrio": "Belgrano",
+      "nombre": "Wolfsohn Primaria",
+      "direccion": "Amenábar 2972",
+      "horario": ""
+    },
+    {
+      "barrio": "Barracas",
+      "nombre": "Or Torah",
+      "direccion": "Brandsen 1444",
+      "horario": "6:30 a 21"
+    },
+    {
+      "barrio": "Paternal",
+      "nombre": "Local H61/H79",
+      "direccion": "Maturín 2729",
+      "horario": "L a J de 9 a 17, V de 9 a 16"
+    },
+    {
+      "barrio": "Villa Crespo / Chacarita",
+      "nombre": "Wolfsohn Secundario",
+      "direccion": "Rosetti 50",
+      "horario": ""
+    },
+    {
+      "barrio": "Otros",
+      "nombre": "Country Círculo",
+      "direccion": "Ezeiza",
+      "horario": "24 hs"
+    },
+    {
+      "barrio": "Otros",
+      "nombre": "Cementerio AISA",
+      "direccion": "Ciudadela",
+      "horario": "A confirmar"
+    },
+    {
+      "barrio": "Otros",
+      "nombre": "Miramar – Hotel Hamakom",
+      "direccion": "",
+      "horario": "24 hs en temporada"
+    }
   ]
 }

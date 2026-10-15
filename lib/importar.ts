@@ -17,10 +17,13 @@ export const normalizar = (s: string) =>
 export function planificarImport(entradas: Entrada[], existentes: Existente[]): Plan {
   const plan: Plan = { crear: [], completar: [], sinCambios: [] };
   for (const e of entradas) {
-    const claves = [e.nombre, ...(e.existente ?? [])].map(normalizar).filter(Boolean);
+    // same name, or a name that starts with one of the names listed in "existente" ("sucat david" → "Sucat David 1").
+    // Never a loose "contains": "Yeshurun" must not match "Yeshurun Primaria".
+    const nombre = normalizar(e.nombre);
+    const alias = (e.existente ?? []).map(normalizar).filter(Boolean);
     const iguales = existentes.filter((x) => {
       const n = normalizar(x.nombre);
-      return claves.some((k) => n === k || n.includes(k));
+      return n === nombre || alias.some((k) => n === k || n.startsWith(k + " "));
     });
     if (!iguales.length) { plan.crear.push(e); continue; }
     for (const x of iguales) {

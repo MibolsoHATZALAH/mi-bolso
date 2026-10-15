@@ -37,3 +37,18 @@ test("running it again creates nothing", () => {
   assert.equal(p2.crear.length, 0);
   assert.equal(p2.completar.length, 0);
 });
+
+test("the 13 bags loaded on 14/10 at night: nothing is duplicated or mixed up", () => {
+  const hoy = ["Bolso toratenu", "Bolso shaare tefila (pasito)", "Bolso Hejal Hatora", "Bolso Shaare Sion", "Bolso Yeshurun Primaria",
+    "Bolso Colel Ecuador", "Bolso Agudat dodim", "Bolso Yeshurun Templo", "Bolso Sucat David 1", "Bolso Templo Lavalle 2449",
+    "Base Once", "Base Flores", "Bolso Sucat David 2"].map((nombre, i) => ({ id: `x${i}`, nombre }));
+  const p = planificarImport(data.bolsos, hoy);
+  const creados = p.crear.map((e) => e.nombre);
+  for (const n of ["Heijal Hatorah", "Primaria Ieshurun", "Yeshurun", "Shaare Tefila", "Toratenu", "Agudat Dodim", "Shaare Sion"]) assert.ok(!creados.includes(n), n);
+  const de = (n: string) => p.completar.find((c) => c.nombre === n)!.campos;
+  assert.deepEqual(de("Bolso Yeshurun Primaria"), { barrio: "Palermo", horario: "9 a 17" });
+  assert.equal(de("Bolso Yeshurun Templo").direccion, "República de la India 3035");
+  assert.equal(de("Bolso Hejal Hatora").direccion, "Ecuador 936");
+  assert.equal(p.completar.length, 12);
+  assert.equal(p.crear.length, 27); // 38 places − 11 already loaded ("Base Flores" is not matched to anything)
+});
