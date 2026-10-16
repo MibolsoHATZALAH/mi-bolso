@@ -13,7 +13,7 @@ import { fb } from "./firebase";
 import { aplicarLista, copiarLista, emptyBolso, listaComun, type Bolso, type Catalog, type CambioLista, type Movimiento } from "./inventory";
 import type { Store } from "./data";
 
-import { ADMINS } from "./config";
+import { ADMINS, EQUIPOS, type EquipoId } from "./config";
 export { ADMINS };
 
 export type Rol = "voluntario" | "gerencia";
@@ -25,6 +25,8 @@ export type BolsoInst = {
   bolso: Bolso; actualizado: Date | null; por: string;
   /** Out of service: the team can't count on this bag (closed, taken away, broken…). */
   fueraDeServicio: boolean; servicioPor: string; servicioDesde: Date | null;
+  /** Extra equipment at the place (DEA, silla…), see EQUIPOS. */
+  equipos: EquipoId[];
 };
 export type DatosBolso = { nombre: string; ubicacion: string; direccion: string; entrecalles: string; barrio: string; horario: string };
 
@@ -96,6 +98,7 @@ export function subscribeBolsos(next: (b: BolsoInst[]) => void, onError: (e: Err
       const x = d.data({ serverTimestamps: "estimate" });
       return { id: d.id, nombre: x.nombre ?? "Bolso", ubicacion: x.ubicacion ?? "", direccion: x.direccion ?? "", entrecalles: x.entrecalles ?? "", barrio: x.barrio ?? "", horario: x.horario ?? "",
         bolso: toBolso(x),
+        equipos: EQUIPOS.map((e) => e.id).filter((id) => Array.isArray(x.equipos) && x.equipos.includes(id)),
         fueraDeServicio: x.fueraDeServicio === true, servicioPor: x.servicioCambio?.nombre ?? "",
         servicioDesde: (x.servicioCambio?.t as Timestamp)?.toDate?.() ?? null,
         actualizado: (x.actualizado as Timestamp)?.toDate?.() ?? null, por: x.actualizadoPor?.nombre ?? "" };
@@ -111,6 +114,8 @@ export async function crearBolso(datos: DatosBolso, copiarDe?: Bolso) {
   return ref.id;
 }
 export const editarBolso = (id: string, datos: DatosBolso) => updateDoc(bolsoRef(id), limpio(datos));
+/** Which extra equipment the place has (management). */
+export const cambiarEquipos = (id: string, equipos: EquipoId[]) => updateDoc(bolsoRef(id), { equipos });
 export const borrarBolso = (id: string) => deleteDoc(bolsoRef(id));
 
 /** The inventory screen's store for one shared bag. Every change is signed with the person's name. */

@@ -14,3 +14,13 @@ export const VAPID_KEY = "BBx-Oso7SaBkdUr7Tspdmy1hAdCOO8VqFqYr7jknams10KU1Kldqoy
 
 /** Neighborhoods of the shared bags, in the order the institution's spreadsheet lists them. */
 export const BARRIOS = ["Congreso", "Once", "Flores", "Palermo", "Belgrano", "Barracas", "Paternal", "Villa Crespo / Chacarita", "Otros"];
+
+/** Extra equipment some places have, shown as small logos on the bag's card (only "has it / doesn't"). */
+export const EQUIPOS = [
+  { id: "dea", nombre: "DEA" },
+  { id: "silla", nombre: "Silla de ruedas" },
+  { id: "tabla", nombre: "Tabla rígida" },
+  { id: "chaleco", nombre: "Chaleco de trauma" },
+  { id: "rem", nombre: "Bolso REM" },
+] as const;
+export type EquipoId = (typeof EQUIPOS)[number]["id"];

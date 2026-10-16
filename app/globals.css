@@ -542,3 +542,29 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 .lista-equipo-dif{font-size:14px;max-height:220px;overflow:auto}
 .lista-equipo-dif p{margin:4px 0}
 .lista-equipo-btns{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---------- Extra equipment logos (DEA, silla, tabla, chaleco, bolso REM) ---------- */
+.equipos{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px}
+.equipo{display:inline-flex;align-items:center;gap:6px}
+.equipo img{width:34px;height:34px;border-radius:8px;display:block;box-shadow:0 2px 6px rgba(0,0,0,.18)}
+.equipos.con-nombre{justify-content:flex-start;flex-wrap:wrap;gap:6px;margin-top:8px}
+.equipos.con-nombre .equipo img{width:38px;height:38px;border-radius:9px}
+.equipos.con-nombre .equipo > span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.bags.dos .equipos{justify-content:flex-start}
+.bags.dos .equipo img{width:28px;height:28px;border-radius:7px}
+.bags.cuatro .equipos{justify-content:flex-start;gap:3px}
+.bags.cuatro .equipo img{width:20px;height:20px;border-radius:5px;box-shadow:none}
+.bag.cerrado .equipo img,.bag.fuera .equipo img{opacity:.6}
+.equipos-edit{margin-top:14px}
+.equipos-edit h4{margin:0;font-size:15px}
+.equipos-opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px}
+.equipo-opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:14px;background:var(--fill);cursor:pointer;font-size:14px;font-weight:600;
+  border:2px solid transparent;color:var(--muted)}
+.equipo-opt img{width:40px;height:40px;border-radius:9px;filter:grayscale(1);opacity:.45}
+.equipo-opt.on{border-color:var(--accent);color:inherit;background:var(--sel)}
+.equipo-opt.on img{filter:none;opacity:1}
+.equipo-opt input{width:20px;height:20px;margin:0;accent-color:var(--accent)}
+.equipos{flex-wrap:nowrap}
+@media (max-width:520px){ .bag-side .equipos{gap:4px} .bag-side .equipo img{width:27px;height:27px;border-radius:7px} .bag-side{max-width:56%} }
+.bags.dos .equipos,.bags.cuatro .equipos{flex-wrap:wrap}
+.equipo-opt span{min-width:0;overflow-wrap:anywhere;line-height:1.2}

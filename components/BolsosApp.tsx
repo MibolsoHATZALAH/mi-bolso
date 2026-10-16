@@ -4,14 +4,14 @@ import { signOut, type User } from "firebase/auth";
 import { fb } from "@/lib/firebase";
 import { alertasVenc, buildCopyTextVarios, resumen, type Bolso, type CambioLista } from "@/lib/inventory";
 import {
-  ADMINS, agregarMiembro, aplicarListaEnOtros, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
+  ADMINS, agregarMiembro, aplicarListaEnOtros, cambiarEquipos, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
   quitarMiembro, rechazar, subscribeAcceso, subscribeBolsos, subscribeEquipo, subscribeSolicitudes,
   type Acceso, type BolsoInst, type DatosBolso, type Miembro, type Rol, type Solicitud,
 } from "@/lib/bolsos";
 import InventoryApp from "./InventoryApp";
 import { UserChip } from "./Login";
 import AlarmasPush from "./AlarmasPush";
-import { BARRIOS } from "@/lib/config";
+import { BARRIOS, EQUIPOS, type EquipoId } from "@/lib/config";
 import { disponibilidad, leerHorario, textoDisponibilidad, type Disponibilidad } from "@/lib/horario";
 
 const STALE_DAYS = 30; // a bag nobody has checked in this long gets flagged
@@ -147,6 +147,25 @@ function BolsoView({ b, bolsos, user, gerencia, chip, onBack, toast }: {
     <section className="cat bag-admin">
       <div className="cat-head"><h3>Datos del bolso</h3></div>
       <CamposBolso id="bag" datos={datos} bolsos={bolsos} onChange={setDatos} onCommit={guardarDatos} />
+      <div className="equipos-edit">
+        <h4>Equipamiento del lugar</h4>
+        <p className="small-note">Marcá lo que hay. Se ve con su logo arriba a la derecha de la tarjeta.</p>
+        <div className="equipos-opts">
+          {EQUIPOS.map((e) => {
+            const tiene = b.equipos.includes(e.id);
+            return (
+              <label key={e.id} className={`equipo-opt ${tiene ? "on" : ""}`}>
+                <input type="checkbox" checked={tiene} onChange={() => {
+                  const next = EQUIPOS.map((x) => x.id).filter((id) => (id === e.id ? !tiene : b.equipos.includes(id)));
+                  cambiarEquipos(b.id, next).then(() => toast(`${e.nombre}: ${tiene ? "no hay" : "hay"}`)).catch(() => toast("No se pudo guardar"));
+                }} />
+                <img src={`${BASE}/equipos/${e.id}.png`} alt="" width={40} height={40} />
+                <span>{e.nombre}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
       {borrar ? (
         <div className="confirm">
           <span>¿Eliminar <b>{b.nombre}</b>? Se borra su inventario y deja de aparecer para todos.</span>
@@ -179,6 +198,7 @@ function BolsoView({ b, bolsos, user, gerencia, chip, onBack, toast }: {
         {b.entrecalles && <span className="entrecalles">{b.entrecalles}</span>}
         {[b.ubicacion, b.horario && `Horario: ${b.horario}`].filter(Boolean).join(" · ")}
         <Disponible d={disponibilidad(leerHorario(b.horario))} />
+        {b.equipos.length > 0 && <Equipos ids={b.equipos} conNombre />}
       </>}
       back={{ label: "Todos los bolsos", onClick: onBack }}
       canEditList={gerencia} editExtra={editExtra} copyTitle={b.nombre}
@@ -415,6 +435,7 @@ function BagCard({ x, user, toast, onOpen, conBarrio }: { x: Dato; user: User; t
           <span className="bag-top">
             <button className="bag-open bag-name" onClick={() => onOpen(b.id)}>{b.nombre}</button>
             <span className="bag-side">
+              {b.equipos.length > 0 && <Equipos ids={b.equipos} />}
               <ServicioBoton b={b} user={user} toast={toast} />
               {b.horario && <span className="bag-horario">{b.horario}</span>}
             </span>
@@ -494,6 +515,21 @@ function ServicioBoton({ b, user, toast, grande }: { b: BolsoInst; user: User; t
     >
       <span className="servicio-dot" aria-hidden="true" /><span className="servicio-txt">{fuera ? "Fuera de servicio" : "En servicio"}</span>
     </button>
+  );
+}
+
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+/** The logos of the extra equipment a place has (DEA, silla, tabla, chaleco, bolso REM). */
+function Equipos({ ids, conNombre }: { ids: EquipoId[]; conNombre?: boolean }) {
+  return (
+    <span className={`equipos ${conNombre ? "con-nombre" : ""}`} aria-label={`Equipamiento: ${ids.map((id) => EQUIPOS.find((e) => e.id === id)!.nombre).join(", ")}`}>
+      {EQUIPOS.filter((e) => ids.includes(e.id)).map((e) => (
+        <span key={e.id} className="equipo" title={e.nombre}>
+          <img src={`${BASE}/equipos/${e.id}.png`} alt={e.nombre} width={34} height={34} />
+          {conNombre && <span>{e.nombre}</span>}
+        </span>
+      ))}
+    </span>
   );
 }
 
