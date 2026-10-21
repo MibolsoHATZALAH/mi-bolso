@@ -81,14 +81,18 @@ export async function aprobar(s: { email: string; nombre: string }, rol: Rol, po
   await batch.commit();
 }
 export const rechazar = (email: string) => deleteDoc(doc(db(), "solicitudes", email));
-export async function agregarMiembro(email: string, rol: Rol, por: User) {
+export async function agregarMiembro(email: string, rol: Rol, por: User, nombre = "") {
   const e = email.trim().toLowerCase();
   const batch = writeBatch(db());
-  batch.set(doc(db(), "equipo", e), { rol, nombre: "", agregadoPor: emailDe(por), agregado: serverTimestamp() });
+  batch.set(doc(db(), "equipo", e), { rol, nombre: nombre.trim(), agregadoPor: emailDe(por), agregado: serverTimestamp() });
   batch.delete(doc(db(), "solicitudes", e));
   await batch.commit();
 }
 export const cambiarRol = (email: string, rol: Rol) => updateDoc(doc(db(), "equipo", email), { rol });
+/** The name management sees for each person in the team. Administrators get a team entry the first time. */
+export const cambiarNombre = (email: string, nombre: string) =>
+  ADMINS.includes(email) ? setDoc(doc(db(), "equipo", email), { rol: "gerencia", nombre: nombre.trim() }, { merge: true })
+    : updateDoc(doc(db(), "equipo", email), { nombre: nombre.trim() });
 export const quitarMiembro = (email: string) => deleteDoc(doc(db(), "equipo", email));
 
 /* ---------- Bags ---------- */

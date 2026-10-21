@@ -568,3 +568,10 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 @media (max-width:520px){ .bag-side .equipos{gap:4px} .bag-side .equipo img{width:27px;height:27px;border-radius:7px} .bag-side{max-width:56%} }
 .bags.dos .equipos,.bags.cuatro .equipos{flex-wrap:wrap}
 .equipo-opt span{min-width:0;overflow-wrap:anywhere;line-height:1.2}
+
+/* ---------- Team: editable names ---------- */
+.nombre-edit{width:100%;min-width:0;font:inherit;font-weight:600;color:var(--ink);background:var(--fill);border:0;border-radius:10px;padding:7px 10px;margin:0 0 2px -2px}
+.nombre-edit:focus{outline:2px solid var(--accent);background:var(--sel)}
+.nombre-edit::placeholder{color:var(--muted);font-weight:500}
+.share-row{flex-wrap:wrap}
+.share-row #eq-nombre,.share-row #eq-email{flex:1 1 180px;min-width:0}

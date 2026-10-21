@@ -4,7 +4,7 @@ import { signOut, type User } from "firebase/auth";
 import { fb } from "@/lib/firebase";
 import { alertasVenc, buildCopyTextVarios, resumen, type Bolso, type CambioLista } from "@/lib/inventory";
 import {
-  ADMINS, agregarMiembro, aplicarListaEnOtros, cambiarEquipos, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
+  ADMINS, agregarMiembro, aplicarListaEnOtros, cambiarEquipos, cambiarNombre, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
   quitarMiembro, rechazar, subscribeAcceso, subscribeBolsos, subscribeEquipo, subscribeSolicitudes,
   type Acceso, type BolsoInst, type DatosBolso, type Miembro, type Rol, type Solicitud,
 } from "@/lib/bolsos";
@@ -561,6 +561,7 @@ function Equipo({ user, solicitudes, chip, onBack, toast }: {
 }) {
   const [miembros, setMiembros] = useState<Miembro[] | null>(null);
   const [email, setEmail] = useState("");
+  const [nombreNuevo, setNombreNuevo] = useState("");
   const [rolNuevo, setRolNuevo] = useState<Rol>("voluntario");
   const [quitar, setQuitar] = useState<string | null>(null);
   const [linkFallback, setLinkFallback] = useState(false);
@@ -568,6 +569,13 @@ function Equipo({ user, solicitudes, chip, onBack, toast }: {
   const link = typeof window !== "undefined" ? window.location.href.split("#")[0] : "";
   const yo = emailDe(user);
   const err = () => toast("No se pudo guardar. Revisá la conexión.");
+  const nombreDeEquipo = (e: string) => miembros?.find((m) => m.email === e)?.nombre ?? "";
+  /** Name field: saves when leaving it or pressing Enter. */
+  const campoNombre = (e: string, actual: string, pista = "") => (
+    <input className="nombre-edit" type="text" defaultValue={actual} key={`${e}-${actual}`} placeholder={pista || "Escribí su nombre"} aria-label={`Nombre de ${e}`}
+      onKeyDown={(ev) => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
+      onBlur={(ev) => { const v = ev.target.value.trim(); if (v !== actual) cambiarNombre(e, v).then(() => toast(v ? `Nombre guardado: ${v}` : "Nombre borrado")).catch(err); }} />
+  );
 
   return (
     <div className="wrap">
@@ -604,17 +612,17 @@ function Equipo({ user, solicitudes, chip, onBack, toast }: {
       </section>
 
       <section className="cat">
-        <div className="cat-head"><h3>Con acceso</h3><span className="num">{miembros ? miembros.length + ADMINS.length : ""}</span></div>
+        <div className="cat-head"><h3>Con acceso</h3><span className="num">{miembros ? miembros.filter((m) => !ADMINS.includes(m.email)).length + ADMINS.length : ""}</span></div>
         <ul className="rows">
           {ADMINS.map((a) => (
             <li className="row" key={a}>
-              <div className="name"><span>{a === yo ? `${user.displayName ?? a} (vos)` : a}</span><span className="sub"><span className="of">{a}</span></span></div>
+              <div className="name">{campoNombre(a, nombreDeEquipo(a), a === yo ? user.displayName ?? "" : "")}<span className="sub"><span className="of">{a}{a === yo ? " · vos" : ""}</span></span></div>
               <span className="pill info">Administrador</span>
             </li>
           ))}
           {miembros?.filter((m) => !ADMINS.includes(m.email)).map((m) => (
             <li className="row" key={m.email}>
-              <div className="name"><span>{m.nombre || m.email}</span><span className="sub"><span className="of">{m.email}</span></span></div>
+              <div className="name">{campoNombre(m.email, m.nombre)}<span className="sub"><span className="of">{m.email}</span></span></div>
               <div className="opts">
                 <select aria-label={`Rol de ${m.email}`} value={m.rol} onChange={(e) => cambiarRol(m.email, e.target.value as Rol).then(() => toast("Rol actualizado")).catch(err)}>
                   <option value="voluntario">Voluntario</option>
@@ -634,11 +642,12 @@ function Equipo({ user, solicitudes, chip, onBack, toast }: {
         e.preventDefault();
         const v = email.trim().toLowerCase();
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return toast("Escribí un email válido");
-        agregarMiembro(v, rolNuevo, user).then(() => { toast(`${v} ya tiene acceso`); setEmail(""); }).catch(err);
+        agregarMiembro(v, rolNuevo, user, nombreNuevo).then(() => { toast(`${nombreNuevo.trim() || v} ya tiene acceso`); setEmail(""); setNombreNuevo(""); }).catch(err);
       }}>
         <div className="cat-head"><h3>Agregar por email</h3></div>
         <p className="empty-note small-note">Si ya sabés el Gmail de la persona, dale acceso directo sin esperar el pedido.</p>
         <div className="share-row">
+          <input type="text" id="eq-nombre" placeholder="Nombre y apellido" value={nombreNuevo} onChange={(e) => setNombreNuevo(e.target.value)} aria-label="Nombre" />
           <input type="email" id="eq-email" placeholder="nombre@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Email" />
           <select id="eq-rol" value={rolNuevo} onChange={(e) => setRolNuevo(e.target.value as Rol)} aria-label="Rol">
             <option value="voluntario">Voluntario</option>
