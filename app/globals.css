@@ -94,7 +94,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
   -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur)}
 
 /* ---------- status band (large title + stats) ---------- */
-.band{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;margin:0 -16px;padding:14px 16px 12px;
+.band{position:relative;z-index:1;margin:0 -16px;padding:14px 16px 12px;
   background:color-mix(in srgb,var(--bg) 72%,transparent);border-bottom:.5px solid var(--line)}
 .band-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .titles{display:flex;flex-direction:column;gap:2px;min-width:0}
