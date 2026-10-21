@@ -12,6 +12,10 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, view
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
+      <head>
+        {/* If the phone opened an old copy of the page whose scripts no longer exist, reload once instead of showing a blank screen. */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){function f(m){if(!/ChunkLoadError|Loading chunk|Loading CSS chunk/.test(String(m)))return;try{var k="recarga-"+location.pathname;var t=+sessionStorage.getItem(k)||0;if(Date.now()-t<30000)return;sessionStorage.setItem(k,Date.now());}catch(e){}location.reload();}addEventListener("error",function(e){f(e&&(e.message||(e.error&&e.error.name)))},true);addEventListener("unhandledrejection",function(e){f(e&&e.reason&&(e.reason.name+" "+e.reason.message))});})();` }} />
+      </head>
       <body>{children}</body>
     </html>
   );
