@@ -1,4 +1,6 @@
-/* Receives push alarms while the app is closed (scope: /mi-bolso/, both apps).
+/* Receives push alarms for Mi Bolso personal while it is closed (scope: /mi-bolso/).
+   The shared bags app has its own copy at /mi-bolso/bolsos/firebase-messaging-sw.js (narrower scope wins on
+   its pages), so each app gets its own push token and only its own alarms (see lib/push.ts).
    Alarms are sent by the daily job (scripts/alarmas.ts) with a notification + link;
    the Firebase SDK shows them and opens the link when tapped. */
 importScripts("https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js");
