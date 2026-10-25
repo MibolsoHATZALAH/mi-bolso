@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { planificar, hoyAR, type Compartido } from "../lib/alarmas.ts";
+import { planificar, hoyAR, repartirTokens, type Compartido } from "../lib/alarmas.ts";
 import { alertasVenc, emptyBolso, setCant, setValue, setVenc, textoVenc } from "../lib/inventory.ts";
 
 const now = new Date(2026, 9, 14, 12, 0, 0);
@@ -87,4 +87,20 @@ test("out-of-service bags get no alarms", () => {
   const r = planificar({ personales: [], compartidos: [sede], gerencia: ["jefe@gmail.com"], now, hoy });
   assert.equal(r.avisos.length, 0);
   assert.equal(r.marcas.length, 0);
+});
+
+test("each app's alarms only reach that app's phones", () => {
+  const { porUid, porEmail } = repartirTokens([
+    { uid: "u1", token: "personal-iphone", email: "Uri@gmail.com", apps: ["personal"] },
+    { uid: "u1", token: "bolsos-iphone", email: "Uri@gmail.com", apps: ["bolsos"] },
+    { uid: "u1", token: "viejo-compartido", email: "uri@gmail.com", apps: [] },      // replaced by both apps
+    { uid: "u2", token: "ana-bolsos", email: "ana@gmail.com", apps: ["bolsos"] },
+    { uid: "u3", token: "sin-app", email: "x@gmail.com" },
+  ]);
+  assert.deepEqual(porUid.get("u1"), ["personal-iphone"]);          // personal expiry alarms
+  assert.deepEqual(porEmail.get("uri@gmail.com"), ["bolsos-iphone"]); // shared-bag missing / expiry alarms
+  assert.equal(porUid.get("u2"), undefined);                          // Ana only uses the shared-bags app
+  assert.deepEqual(porEmail.get("ana@gmail.com"), ["ana-bolsos"]);
+  assert.equal(porUid.get("u3"), undefined);
+  assert.equal(porEmail.get("x@gmail.com"), undefined);
 });

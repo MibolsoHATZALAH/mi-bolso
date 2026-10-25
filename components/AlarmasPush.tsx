@@ -11,12 +11,12 @@ export default function AlarmasPush({ user, app }: { user: User; app: "personal"
 
   useEffect(() => {
     let vivo = true;
-    estadoPush().then((e) => {
+    estadoPush(app).then((e) => {
       if (!vivo) return;
       setEstado(e);
       if (e === "activo") guardarToken(user, app).catch(() => {}); // keep the token fresh
     });
-    const off = escucharPush();
+    const off = escucharPush(app);
     return () => { vivo = false; off(); };
   }, [user, app]);
 
@@ -26,7 +26,7 @@ export default function AlarmasPush({ user, app }: { user: User; app: "personal"
     <div className={`alarmas-push ${estado}`}>
       {estado === "activo" && (<>
         <span><b>Alarmas activadas</b> en este celular</span>
-        <button className="link-btn" onClick={() => probarPush().catch(() => setError("No se pudo mostrar la prueba"))}>Probar</button>
+        <button className="link-btn" onClick={() => probarPush(app).catch(() => setError("No se pudo mostrar la prueba"))}>Probar</button>
       </>)}
       {estado === "apagado" && (<>
         <span>Recibí alarmas de vencimientos{app === "bolsos" ? " y faltantes" : ""} aunque la app esté cerrada.</span>

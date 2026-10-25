@@ -8,7 +8,7 @@
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
-import { planificar, hoyAR, type Compartido, type Personal } from "../lib/alarmas.ts";
+import { planificar, hoyAR, repartirTokens, type Compartido, type Personal } from "../lib/alarmas.ts";
 import { ADMINS, APP_URL } from "../lib/config.ts";
 import type { Bolso } from "../lib/inventory.ts";
 
@@ -43,16 +43,13 @@ const compartidos: Compartido[] = bolsosSnap.docs.map((d) => {
 const gerencia = [...ADMINS, ...equipoSnap.docs.filter((d) => d.data().rol === "gerencia").map((d) => d.id)];
 const miembros = new Set([...gerencia, ...equipoSnap.docs.map((d) => d.id)].map((e) => e.toLowerCase()));
 
-// phones: by owner uid and by email
-const tokensPorUid = new Map<string, string[]>(), tokensPorEmail = new Map<string, string[]>(), refPorToken = new Map<string, FirebaseFirestore.DocumentReference>();
-for (const d of pushSnap.docs) {
-  const uid = d.ref.parent.parent?.id, x = d.data(), token = x.token as string | undefined;
-  if (!uid || !token) continue;
-  refPorToken.set(token, d.ref);
-  tokensPorUid.set(uid, [...(tokensPorUid.get(uid) ?? []), token]);
-  const email = String(x.email ?? "").toLowerCase();
-  if (email) tokensPorEmail.set(email, [...(tokensPorEmail.get(email) ?? []), token]);
-}
+// phones: personal-bag alarms go to the owner's "personal" phones (by uid), shared-bag alarms to the
+// person's "bolsos" phones (by email). Each app registers its own token, so they never cross.
+const { porUid: tokensPorUid, porEmail: tokensPorEmail } = repartirTokens(
+  pushSnap.docs.map((d) => ({ uid: d.ref.parent.parent?.id, ...d.data() })),
+);
+const refPorToken = new Map<string, FirebaseFirestore.DocumentReference>();
+for (const d of pushSnap.docs) if (d.data().token) refPorToken.set(d.data().token, d.ref);
 
 const { avisos, marcas } = planificar({ personales, compartidos, gerencia, now, hoy });
 

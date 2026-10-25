@@ -97,3 +97,24 @@ export function planificar(
 
 /** Today's date in Buenos Aires as YYYY-MM-DD (the job runs in UTC). */
 export const hoyAR = (now = new Date()) => new Date(now.getTime() - 3 * 3600e3).toISOString().slice(0, 10);
+
+/** Phones that turned alarms on, as saved in users/{uid}/push/{token}. */
+export type TokenDoc = { uid?: string; token?: string; email?: string; apps?: string[] };
+
+/**
+ * Who gets what: personal alarms ("uid:…") only reach tokens of the personal app, shared-bag alarms
+ * ("email:…") only tokens of the shared-bags app. A token with no app left (an old shared token both apps
+ * have since replaced) gets nothing.
+ */
+export function repartirTokens(docs: TokenDoc[]) {
+  const porUid = new Map<string, string[]>(), porEmail = new Map<string, string[]>();
+  const push = (m: Map<string, string[]>, k: string, t: string) => { const l = m.get(k) ?? []; if (!l.includes(t)) l.push(t); m.set(k, l); };
+  for (const d of docs) {
+    if (!d.uid || !d.token) continue;
+    const apps = Array.isArray(d.apps) ? d.apps : [];
+    if (apps.includes("personal")) push(porUid, d.uid, d.token);
+    const email = String(d.email ?? "").toLowerCase();
+    if (email && apps.includes("bolsos")) push(porEmail, email, d.token);
+  }
+  return { porUid, porEmail };
+}
