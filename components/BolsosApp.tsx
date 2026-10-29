@@ -4,7 +4,7 @@ import { signOut, type User } from "firebase/auth";
 import { fb } from "@/lib/firebase";
 import { alertasVenc, buildCopyTextVarios, resumen, type Bolso, type CambioLista } from "@/lib/inventory";
 import {
-  ADMINS, agregarMiembro, aplicarListaEnOtros, cambiarEquipos, cambiarHorario, guardarGeo, cambiarNombre, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
+  ADMINS, agregarMiembro, aplicarListaEnOtros, cambiarEquipos, cambiarHorario, esAdmin, guardarGeo, cambiarNombre, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
   quitarMiembro, rechazar, subscribeAcceso, subscribeBolsos, subscribeEquipo, subscribeSolicitudes,
   type Acceso, type BolsoInst, type DatosBolso, type Miembro, type Rol, type Solicitud,
 } from "@/lib/bolsos";
@@ -110,7 +110,7 @@ function BolsosApp({ user, rol }: { user: User; rol: Rol }) {
     <>
       {vista.k === "equipo" && gerencia
         ? <Equipo user={user} solicitudes={solicitudes} chip={chip} onBack={() => ir({ k: "lista" })} toast={toast} />
-        : vista.k === "horarios" && gerencia
+        : vista.k === "horarios" && esAdmin(user)
         ? <Horarios bolsos={bolsos} chip={chip} onBack={() => ir({ k: "lista" })} onOpen={(id) => ir({ k: "bolso", id })} toast={toast} />
         : <Lista bolsos={bolsos} user={user} gerencia={gerencia} pendientes={solicitudes.length} chip={chip} alarmas={<AlarmasPush user={user} app="bolsos" />}
             onOpen={(id) => ir({ k: "bolso", id })} onEquipo={() => ir({ k: "equipo" })} onHorarios={() => ir({ k: "horarios" })} toast={toast} />}
@@ -230,6 +230,7 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
 }) {
   const [nuevo, setNuevo] = useState(false);
   const [copyFallback, setCopyFallback] = useState("");
+  const toques = useRef({ n: 0, t: 0 });
   // the clock: availability is recomputed every 30 s
   const [ahora, setAhora] = useState(() => new Date());
   useEffect(() => { const t = setInterval(() => setAhora(new Date()), 30_000); return () => clearInterval(t); }, []);
@@ -347,7 +348,13 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
     <div className="wrap ancho">
       <header className="band">
         <div className="band-top">
-          <div className="titles"><h1>Bolsos</h1><span className="subtitle">{gerencia ? "Gerencia · estado de todos los bolsos" : "Bolsos de la institución"}</span></div>
+          {/* hidden door: 5 quick taps on the title open the "Horarios" table, only for the administrator */}
+          <div className="titles"><h1 onClick={() => {
+            if (!esAdmin(user)) return;
+            const t = Date.now(), c = toques.current;
+            c.n = t - c.t < 1500 ? c.n + 1 : 1; c.t = t;
+            if (c.n >= 5) { c.n = 0; onHorarios(); }
+          }}>Bolsos</h1><span className="subtitle">{gerencia ? "Gerencia · estado de todos los bolsos" : "Bolsos de la institución"}</span></div>
           {chip}
         </div>
         <div className={`meter ${fueraN ? "cuatro" : ""}`}>
@@ -363,7 +370,6 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
         <div className="toolbar">
           <button className="btn primary" onClick={() => setNuevo(!nuevo)}>{nuevo ? "Cancelar" : "Agregar bolso"}</button>
           <button className="btn" onClick={onEquipo}>Equipo{pendientes > 0 && <span className="cnt">{pendientes}</span>}</button>
-          <button className="btn" onClick={onHorarios}>Horarios</button>
           <button className="btn" onClick={copiar} disabled={!bolsos.length}>Copiar lista para reponer</button>
         </div>
       )}
