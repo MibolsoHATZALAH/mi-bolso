@@ -623,3 +623,5 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 .enc-bolso.on{outline:2px solid var(--accent);font-weight:600}
 .enc-bolso input{width:18px;height:18px;accent-color:var(--accent)}
 .enc-barrio{color:var(--muted);font-weight:400;font-size:13px}
+span.servicio.solo-ver{cursor:default}
+.servicio.solo-ver:active{transform:none}

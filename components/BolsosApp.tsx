@@ -1,12 +1,12 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { signOut, type User } from "firebase/auth";
 import { fb } from "@/lib/firebase";
 import { alertasVenc, buildCopyTextVarios, resumen, type Bolso, type CambioLista } from "@/lib/inventory";
 import {
   ADMINS, agregarMiembro, aplicarListaEnOtros, asignarBolsos, cambiarEquipos, cambiarHorario, esAdmin, guardarGeo, cambiarNombre, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
   quitarMiembro, rechazar, subscribeAcceso, subscribeBolsos, subscribeEquipo, subscribeSolicitudes,
-  type Acceso, type BolsoInst, type DatosBolso, type Miembro, type Rol, type Solicitud,
+  puedeServicio, type Acceso, type BolsoInst, type DatosBolso, type Miembro, type Rol, type Solicitud,
 } from "@/lib/bolsos";
 import InventoryApp from "./InventoryApp";
 import { UserChip } from "./Login";
@@ -66,6 +66,7 @@ export default function BolsosGate({ user }: { user: User }) {
 
 function BolsosApp({ user, rol, misBolsos }: { user: User; rol: Rol; misBolsos: string[] }) {
   const gerencia = rol === "gerencia";
+  const servicio = puedeServicio(rol);
   const encargado = rol === "encargado";
   const clavesMias = misBolsos.join("|"); // re-subscribe when the administrator changes their bags
   const [vista, setVista] = useState<Vista>({ k: "lista" });
@@ -101,15 +102,15 @@ function BolsosApp({ user, rol, misBolsos }: { user: User; rol: Rol; misBolsos: 
       </div>
     );
     return (
-      <>
+      <PuedeServicio.Provider value={servicio}>
         <BolsoView key={b.id} b={b} bolsos={bolsos} user={user} gerencia={gerencia} chip={chip} onBack={() => ir({ k: "lista" })} toast={toast} />
         <div className={`toast ${toastMsg ? "show" : ""}`} role="status">{toastMsg}</div>
-      </>
+      </PuedeServicio.Provider>
     );
   }
 
   return (
-    <>
+    <PuedeServicio.Provider value={servicio}>
       {vista.k === "equipo" && gerencia
         ? <Equipo user={user} bolsos={bolsos} solicitudes={solicitudes} chip={chip} onBack={() => ir({ k: "lista" })} toast={toast} />
         : vista.k === "horarios" && esAdmin(user)
@@ -117,7 +118,7 @@ function BolsosApp({ user, rol, misBolsos }: { user: User; rol: Rol; misBolsos: 
         : <Lista bolsos={bolsos} user={user} gerencia={gerencia} encargado={encargado} pendientes={solicitudes.length} chip={chip} alarmas={<AlarmasPush user={user} app="bolsos" />}
             onOpen={(id) => ir({ k: "bolso", id })} onEquipo={() => ir({ k: "equipo" })} onHorarios={() => ir({ k: "horarios" })} toast={toast} />}
       <div className={`toast ${toastMsg ? "show" : ""}`} role="status">{toastMsg}</div>
-    </>
+    </PuedeServicio.Provider>
   );
 }
 
@@ -612,10 +613,19 @@ function Disponible({ d }: { d: Disponibilidad }) {
   return <span className={`disp ${d.estado}`}><span className="disp-dot" aria-hidden="true" />{d.estado === "cerrado" ? `No disponible en este horario · ${textoDisponibilidad(d)}` : textoDisponibilidad(d)}</span>;
 }
 
-/** "En servicio" (green) ⇄ "Fuera de servicio" (red). Any team member can switch it; it is logged. */
+/** Whether the viewer may switch bags in / out of service (dispatch and management). */
+const PuedeServicio = createContext(false);
+
+/** "En servicio" (green) ⇄ "Fuera de servicio" (red). Only dispatch and management switch it (it is logged); everyone else just sees it. */
 function ServicioBoton({ b, user, toast, grande }: { b: BolsoInst; user: User; toast: (m: string) => void; grande?: boolean }) {
   const [busy, setBusy] = useState(false);
+  const puede = useContext(PuedeServicio);
   const fuera = b.fueraDeServicio;
+  if (!puede) return (
+    <span className={`servicio solo-ver ${fuera ? "off" : "on"} ${grande ? "grande" : ""}`} title="Sólo despacho cambia el servicio">
+      <span className="servicio-dot" aria-hidden="true" /><span className="servicio-txt">{fuera ? "Fuera de servicio" : "En servicio"}</span>
+    </span>
+  );
   return (
     <button
       className={`servicio ${fuera ? "off" : "on"} ${grande ? "grande" : ""}`} aria-pressed={!fuera} disabled={busy}
@@ -720,6 +730,7 @@ function Equipo({ user, bolsos, solicitudes, chip, onBack, toast }: {
               <div className="opts">
                 <button className="btn primary" onClick={() => aprobar(s, "voluntario", user).then(() => toast(`${s.nombre || s.email} ya tiene acceso`)).catch(err)}>Aprobar</button>
                 <button className="btn" onClick={() => aprobar(s, "gerencia", user).then(() => toast(`${s.nombre || s.email} es gerencia`)).catch(err)}>Como gerencia</button>
+                <button className="btn" onClick={() => aprobar(s, "despacho", user).then(() => toast(`${s.nombre || s.email} es despacho`)).catch(err)}>Como despacho</button>
                 {soyAdmin && <button className="btn" onClick={() => aprobar(s, "encargado", user).then(() => { toast(`${s.nombre || s.email} es encargado: elegí sus bolsos abajo`); setAbierto(s.email); }).catch(err)}>Como encargado</button>}
                 <button className="btn danger" onClick={() => rechazar(s.email).then(() => toast("Pedido rechazado")).catch(err)}>Rechazar</button>
               </div>
@@ -759,7 +770,8 @@ function Equipo({ user, bolsos, solicitudes, chip, onBack, toast }: {
                     const r = e.target.value as Rol;
                     cambiarRol(m.email, r, m.rol).then(() => { toast("Rol actualizado"); if (r === "encargado") setAbierto(m.email); }).catch(err);
                   }}>
-                    <option value="voluntario">Voluntario / despacho</option>
+                    <option value="voluntario">Voluntario</option>
+                    <option value="despacho">Despacho</option>
                     <option value="gerencia">Gerencia</option>
                     {soyAdmin && <option value="encargado">Encargado</option>}
                   </select>
@@ -788,7 +800,7 @@ function Equipo({ user, bolsos, solicitudes, chip, onBack, toast }: {
             );
           })}
         </ul>
-        <p className="empty-note small-note"><b>Voluntario / despacho:</b> ve todos los bolsos, registra usos y reposiciones. <b>Encargado:</b> lo mismo, pero sólo en los bolsos que le asigna el administrador; los demás no los ve. <b>Gerencia:</b> ve todo, agrega o elimina bolsos, edita la lista de elementos y maneja el equipo.</p>
+        <p className="empty-note small-note"><b>Voluntario:</b> ve todos los bolsos, registra usos y reposiciones. <b>Despacho:</b> lo mismo y además pone cada bolso en servicio o fuera de servicio. <b>Encargado:</b> como voluntario, pero sólo en los bolsos que le asigna el administrador; los demás no los ve. <b>Gerencia:</b> ve todo, agrega o elimina bolsos, edita la lista de elementos y maneja el equipo.</p>
       </section>
 
       <form className="cat" onSubmit={(e) => {
@@ -807,7 +819,8 @@ function Equipo({ user, bolsos, solicitudes, chip, onBack, toast }: {
           <input type="text" id="eq-nombre" placeholder="Nombre y apellido" value={nombreNuevo} onChange={(e) => setNombreNuevo(e.target.value)} aria-label="Nombre" />
           <input type="email" id="eq-email" placeholder="nombre@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Email" />
           <select id="eq-rol" value={rolNuevo} onChange={(e) => setRolNuevo(e.target.value as Rol)} aria-label="Rol">
-            <option value="voluntario">Voluntario / despacho</option>
+            <option value="voluntario">Voluntario</option>
+                    <option value="despacho">Despacho</option>
             <option value="gerencia">Gerencia</option>
             {soyAdmin && <option value="encargado">Encargado</option>}
           </select>

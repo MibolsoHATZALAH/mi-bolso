@@ -8,12 +8,13 @@ rules_version = '2';
 //   users/{uid}/movimientos/{id}   historial: usos, reposiciones y ajustes
 //
 // Institución — bolsos compartidos, sólo para el equipo:
-//   equipo/{email}                 quién tiene acceso: rol "voluntario" | "gerencia" | "encargado" (+ bolsos: [ids])
+//   equipo/{email}                 quién tiene acceso: rol "voluntario" | "despacho" | "gerencia" | "encargado" (+ bolsos: [ids])
 //   solicitudes/{email}            pedidos de acceso de quien entra por primera vez
 //   bolsos/{id}                    un bolso: nombre, ubicación + inventario
 //   bolsos/{id}/movimientos/{id}   su historial, firmado por quien lo hizo (por)
 //
-// Voluntario (y despacho): ve todos los bolsos, carga usos / reposiciones / ajustes y marca en servicio / fuera de servicio.
+// Voluntario: ve todos los bolsos, carga usos / reposiciones / ajustes.
+// Despacho: lo mismo y además marca los bolsos en servicio / fuera de servicio (nadie más, salvo gerencia).
 // Encargado: lo mismo, pero SÓLO en los bolsos de su lista (equipo/{email}.bolsos); los demás no los puede ni leer.
 // Gerencia: ve todo; además crea, renombra y elimina bolsos, edita las listas y maneja el equipo (salvo encargados).
 // Administradores (lista fija, igual que ADMINS en lib/config.ts): siempre gerencia; los únicos que nombran
@@ -28,7 +29,8 @@ service cloud.firestore {
     function miembroDoc() { return /databases/$(database)/documents/equipo/$(email()); }
     function miembro() { return admin() || (verified() && exists(miembroDoc())); }
     function gerencia() { return admin() || (verified() && exists(miembroDoc()) && get(miembroDoc()).data.rol == 'gerencia'); }
-    function veTodo() { return admin() || (verified() && exists(miembroDoc()) && get(miembroDoc()).data.rol in ['voluntario', 'gerencia']); }
+    function veTodo() { return admin() || (verified() && exists(miembroDoc()) && get(miembroDoc()).data.rol in ['voluntario', 'despacho', 'gerencia']); }
+    function despacho() { return verified() && exists(miembroDoc()) && get(miembroDoc()).data.rol == 'despacho'; }
     function encargadoDe(b) {
       return verified() && exists(miembroDoc()) && get(miembroDoc()).data.rol == 'encargado'
         && b in get(miembroDoc()).data.get('bolsos', []);
@@ -50,7 +52,7 @@ service cloud.firestore {
       // encargados (and their bags) are handled only by the administrator
       allow write: if admin()
         || (gerencia()
-            && (request.resource == null || (request.resource.data.rol in ['voluntario', 'gerencia'] && !('bolsos' in request.resource.data)))
+            && (request.resource == null || (request.resource.data.rol in ['voluntario', 'despacho', 'gerencia'] && !('bolsos' in request.resource.data)))
             && (resource == null || resource.data.rol != 'encargado'));
     }
 
@@ -68,8 +70,8 @@ service cloud.firestore {
         || (puede(b)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['valores', 'cant', 'venc', 'actualizado', 'actualizadoPor'])
             && request.resource.data.actualizadoPor.uid == request.auth.uid)
-        // cualquiera del equipo marca el bolso en servicio / fuera de servicio (queda firmado)
-        || (puede(b)
+        // sólo despacho marca el bolso en servicio / fuera de servicio (queda firmado)
+        || (despacho()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fueraDeServicio', 'servicioCambio'])
             && request.resource.data.fueraDeServicio is bool
             && request.resource.data.servicioCambio.uid == request.auth.uid);

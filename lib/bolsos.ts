@@ -2,7 +2,7 @@
 // Shared bags of the institution. Layout (see firestore.rules):
 //   bolsos/{id}                    one bag: nombre, ubicacion + the same inventory fields as a personal bag
 //   bolsos/{id}/movimientos/{id}   its history, each entry signed with who did it (por)
-//   equipo/{email}                 who may use the shared bags: rol "voluntario" | "gerencia"
+//   equipo/{email}                 who may use the shared bags: rol "voluntario" | "despacho" | "gerencia" | "encargado"
 //   solicitudes/{email}            access requests from people who signed in but are not in the team yet
 import {
   doc, collection, onSnapshot, query, orderBy, limit as qLimit, serverTimestamp, writeBatch,
@@ -16,12 +16,15 @@ import type { Store } from "./data";
 import { ADMINS, EQUIPOS, type EquipoId } from "./config";
 export { ADMINS };
 
-/** voluntario / dispatch: every bag · gerencia: every bag + lists, bags and team · encargado: only the bags the administrator gave them. */
-export type Rol = "voluntario" | "gerencia" | "encargado";
+/** voluntario: every bag · despacho: every bag + puts bags in / out of service · gerencia: every bag + service, lists, bags and team ·
+ *  encargado: only the bags the administrator gave them. */
+export type Rol = "voluntario" | "despacho" | "gerencia" | "encargado";
+/** Who may switch a bag in / out of service (firestore.rules: servicio()). */
+export const puedeServicio = (r: Rol) => r === "despacho" || r === "gerencia";
 export type Acceso = { estado: "cargando" } | { estado: "pendiente" } | { estado: "miembro"; rol: Rol; bolsos: string[] };
 export type Miembro = { email: string; rol: Rol; nombre: string; bolsos: string[] };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const rolDe = (x: any): Rol => (x?.rol === "gerencia" ? "gerencia" : x?.rol === "encargado" ? "encargado" : "voluntario");
+const rolDe = (x: any): Rol => (["gerencia", "encargado", "despacho"].includes(x?.rol) ? x.rol : "voluntario");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const bolsosDe = (x: any): string[] => (Array.isArray(x?.bolsos) ? x.bolsos.filter((b: unknown) => typeof b === "string") : []);
 export type Solicitud = { email: string; nombre: string; foto: string; t: Date };
@@ -240,7 +243,7 @@ export async function copiarListaATodos(bolsos: BolsoInst[], origen: BolsoInst) 
   return n;
 }
 
-/** Marks a shared bag in or out of service. Any team member can do it; it is signed and logged in the bag's history. */
+/** Marks a shared bag in or out of service. Dispatch and management only; it is signed and logged in the bag's history. */
 export async function cambiarServicio(id: string, fuera: boolean, user: User) {
   const por = { uid: user.uid, nombre: nombreDe(user), email: emailDe(user) };
   const batch = writeBatch(db());
