@@ -575,3 +575,19 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 .nombre-edit::placeholder{color:var(--muted);font-weight:500}
 .share-row{flex-wrap:wrap}
 .share-row #eq-nombre,.share-row #eq-email{flex:1 1 180px;min-width:0}
+
+/* ---- bags near an emergency address ---- */
+.barrio.emergencia .barrio-head span:first-child{color:var(--bad)}
+.emer-lugar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 4px 10px;font-size:17px}
+.emer-pin{font-size:20px}
+.emer-fuera{color:var(--muted);font-weight:500}
+.emer-otras{margin-bottom:10px;align-items:center}
+.emer-otras-label{flex:0 0 auto;font-size:13px;color:var(--muted);font-weight:600}
+.emer-aviso{margin:0 4px 10px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--orange) 14%,transparent);font-size:15px}
+.dist{display:flex;align-items:baseline;gap:4px 10px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.dist-m{font-size:18px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.dist.primero .dist-m{color:var(--accent)}
+.dist-link{font-size:14px}
+.bags.cuatro .dist{font-size:11px;gap:2px 6px}
+.bags.cuatro .dist-m{font-size:14px}
+.bags.cuatro .dist-min{display:none}

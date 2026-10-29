@@ -27,6 +27,8 @@ export type BolsoInst = {
   fueraDeServicio: boolean; servicioPor: string; servicioDesde: Date | null;
   /** Extra equipment at the place (DEA, silla…), see EQUIPOS. */
   equipos: EquipoId[];
+  /** Where the bag is on the map, saved for its current address (lib/geo.ts). Null until someone from management looks it up. */
+  geo: { lat: number; lng: number; dir: string } | null;
 };
 export type DatosBolso = { nombre: string; ubicacion: string; direccion: string; entrecalles: string; barrio: string; horario: string };
 
@@ -103,6 +105,7 @@ export function subscribeBolsos(next: (b: BolsoInst[]) => void, onError: (e: Err
       return { id: d.id, nombre: x.nombre ?? "Bolso", ubicacion: x.ubicacion ?? "", direccion: x.direccion ?? "", entrecalles: x.entrecalles ?? "", barrio: x.barrio ?? "", horario: x.horario ?? "",
         bolso: toBolso(x),
         equipos: EQUIPOS.map((e) => e.id).filter((id) => Array.isArray(x.equipos) && x.equipos.includes(id)),
+        geo: x.geo && Number.isFinite(x.geo.lat) && Number.isFinite(x.geo.lng) ? { lat: x.geo.lat, lng: x.geo.lng, dir: String(x.geo.dir ?? "") } : null,
         fueraDeServicio: x.fueraDeServicio === true, servicioPor: x.servicioCambio?.nombre ?? "",
         servicioDesde: (x.servicioCambio?.t as Timestamp)?.toDate?.() ?? null,
         actualizado: (x.actualizado as Timestamp)?.toDate?.() ?? null, por: x.actualizadoPor?.nombre ?? "" };
@@ -121,6 +124,8 @@ export const editarBolso = (id: string, datos: DatosBolso) => updateDoc(bolsoRef
 /** Which extra equipment the place has (management). */
 export const cambiarEquipos = (id: string, equipos: EquipoId[]) => updateDoc(bolsoRef(id), { equipos });
 export const borrarBolso = (id: string) => deleteDoc(bolsoRef(id));
+/** Saves where a bag is for the address it has now (management; everyone else reads it). */
+export const guardarGeo = (id: string, geo: { lat: number; lng: number; dir: string }) => updateDoc(bolsoRef(id), { geo });
 
 /** The inventory screen's store for one shared bag. Every change is signed with the person's name. */
 export function bolsoStore(id: string, user: User): Store {

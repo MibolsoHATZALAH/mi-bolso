@@ -4,7 +4,7 @@ import { signOut, type User } from "firebase/auth";
 import { fb } from "@/lib/firebase";
 import { alertasVenc, buildCopyTextVarios, resumen, type Bolso, type CambioLista } from "@/lib/inventory";
 import {
-  ADMINS, agregarMiembro, aplicarListaEnOtros, cambiarEquipos, cambiarNombre, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
+  ADMINS, agregarMiembro, aplicarListaEnOtros, cambiarEquipos, guardarGeo, cambiarNombre, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
   quitarMiembro, rechazar, subscribeAcceso, subscribeBolsos, subscribeEquipo, subscribeSolicitudes,
   type Acceso, type BolsoInst, type DatosBolso, type Miembro, type Rol, type Solicitud,
 } from "@/lib/bolsos";
@@ -13,6 +13,7 @@ import { UserChip } from "./Login";
 import AlarmasPush from "./AlarmasPush";
 import { BARRIOS, EQUIPOS, type EquipoId } from "@/lib/config";
 import { disponibilidad, leerHorario, textoDisponibilidad, type Disponibilidad } from "@/lib/horario";
+import { buscarLugares, cercanos, fmtDist, linkComoLlegar, minutosCaminando, pareceDireccion, ubicarBolso, type Lugar, type Punto } from "@/lib/geo";
 
 const STALE_DAYS = 30; // a bag nobody has checked in this long gets flagged
 type Vista = { k: "lista" } | { k: "bolso"; id: string } | { k: "equipo" };
@@ -249,17 +250,62 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
   const elegirBarrio = (b: string) => { setBarrio(b); try { localStorage.setItem("bolsos-barrio", b); } catch {} };
   const barrioActivo = barrio && todosLosBarrios.includes(barrio) ? barrio : "";
 
+  // ---- emergency address in the search box → nearest bags ----
+  const esDir = pareceDireccion(q);
+  const [emer, setEmer] = useState<{ q: string; estado: "buscando" | "ok" | "nada" | "error"; lugares: Lugar[]; i: number } | null>(null);
+  useEffect(() => {
+    if (!esDir) { setEmer(null); return; }
+    const qq = q.trim(), ctrl = new AbortController();
+    const t = setTimeout(async () => {
+      setEmer((e) => ({ q: qq, estado: "buscando", lugares: e?.lugares ?? [], i: 0 }));
+      try {
+        const l = await buscarLugares(qq, ctrl.signal);
+        setEmer({ q: qq, estado: l.length ? "ok" : "nada", lugares: l, i: 0 });
+      } catch (e) { if ((e as Error).name !== "AbortError") setEmer({ q: qq, estado: "error", lugares: [], i: 0 }); }
+    }, 600);
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, [q, esDir]);
+  const lugar = emer && emer.lugares.length && emer.estado !== "nada" && emer.estado !== "error" ? emer.lugares[emer.i] ?? null : null;
+
+  // where each bag is: saved on the bag, or looked up from its address (management saves it for everyone)
+  const clave = (b: BolsoInst) => `${b.id}|${b.direccion.trim()}`;
+  const puntosRef = useRef<Record<string, Punto | null>>({});
+  const [puntos, setPuntos] = useState<Record<string, Punto | null>>({});
+  const [ubicando, setUbicando] = useState(false);
+  const hayLugar = !!lugar;
+  useEffect(() => {
+    if (!hayLugar) return;
+    let vivo = true;
+    const cola = bolsos.filter((b) => !(clave(b) in puntosRef.current));
+    if (!cola.length) { setUbicando(false); return; }
+    setUbicando(true);
+    const trabajar = async () => {
+      for (let b = cola.shift(); b; b = cola.shift()) {
+        const dir = b.direccion.trim();
+        let p: Punto | null = b.geo && b.geo.dir === dir ? { lat: b.geo.lat, lng: b.geo.lng } : null;
+        if (!p && dir) {
+          p = await ubicarBolso(dir, b.barrio.trim().toLowerCase() !== "otros");
+          if (p && gerencia) guardarGeo(b.id, { ...p, dir }).catch(() => {});
+        }
+        puntosRef.current[clave(b)] = p;
+        if (vivo) setPuntos({ ...puntosRef.current });
+      }
+    };
+    Promise.all([1, 2, 3, 4].map(trabajar)).then(() => { if (vivo) setUbicando(false); });
+    return () => { vivo = false; };
+  }, [hayLugar, bolsos, gerencia]);
+
   // filter: neighborhood chip + search box (neighborhood, name or address; "11" finds Once)
   const visibles = useMemo(() => {
     const t = normalizar(q).replace(/^barrio\s+/, "");
     const claves = t ? [t, ...(SINONIMOS[t] ?? [])] : [];
     return datos.filter((x) => {
       if (barrioActivo && barrioDe(x) !== barrioActivo) return false;
-      if (!claves.length) return true;
+      if (!claves.length || esDir) return true;
       const texto = normalizar([x.b.barrio, x.b.nombre, x.b.direccion, x.b.ubicacion].join(" "));
       return claves.some((k) => texto.includes(k));
     });
-  }, [datos, barrioActivo, q]);
+  }, [datos, barrioActivo, q, esDir]);
 
   // out of service or incomplete → on top, once (taken out of their neighborhood)
   const cerradoAhora = (x: Dato) => !x.b.fueraDeServicio && x.disp.estado === "cerrado";
@@ -274,9 +320,13 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
     for (const x of visibles) { if (necesitaAtencion(x) || cerradoAhora(x)) continue; const k = barrioDe(x); if (!m.has(k)) m.set(k, []); m.get(k)!.push(x); }
     return [...m.entries()].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b, "es")).map(([barrio, items]) => ({ barrio, items }));
   }, [visibles]);
-  const filtrando = !!barrioActivo || !!q.trim();
+  const cerca = useMemo(() => lugar
+    ? cercanos(lugar, datos.map((x) => ({ x, p: puntos[clave(x.b)] ?? null, usable: !x.b.fueraDeServicio && x.disp.estado !== "cerrado" })), 5)
+    : null, [lugar, datos, puntos]);
+  const modoEmergencia = esDir && !!emer && emer.estado !== "nada" && emer.estado !== "error";
+  const filtrando = !!barrioActivo || (!!q.trim() && !modoEmergencia);
   const claseCols = cols === 4 ? "cuatro" : cols === 2 ? "dos" : "";
-  const card = (x: Dato, conBarrio = false) => <BagCard key={x.b.id} x={x} user={user} toast={toast} onOpen={onOpen} conBarrio={conBarrio} />;
+  const card = (x: Dato, conBarrio = false, extra?: React.ReactNode) => <BagCard key={x.b.id} x={x} user={user} toast={toast} onOpen={onOpen} conBarrio={conBarrio} extra={extra} />;
   const activos = datos.filter((x) => !x.b.fueraDeServicio);
   const fueraN = datos.length - activos.length;
   const conFaltantes = activos.filter((x) => x.r.cargados && x.r.faltan).length;
@@ -330,7 +380,9 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
       {bolsos.length > 1 && (<>
         <div className="filtros">
           <div className="buscar">
-            <input type="search" id="bolsos-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar barrio, bolso o dirección" aria-label="Buscar barrio, bolso o dirección" />
+            <input type="search" id="bolsos-q" value={q} onChange={(e) => setQ(e.target.value)} enterKeyHint="search"
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+              placeholder="Barrio, bolso o dirección de la emergencia" aria-label="Buscar barrio, bolso o dirección de la emergencia" />
           </div>
           <div className="chips" role="group" aria-label="Filtrar por barrio">
             <button className="chip" aria-pressed={!barrioActivo} onClick={() => elegirBarrio("")}>Todos</button>
@@ -351,9 +403,50 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
         </div>
       </>)}
 
-      {filtrando && !visibles.length && <p className="none" style={{ marginTop: 16 }}>No hay bolsos que coincidan con la búsqueda.</p>}
+      {esDir && emer && (
+        <section className="barrio emergencia" aria-live="polite">
+          <h2 className="barrio-head"><span>Bolsos cerca de la emergencia</span>{cerca && <span className="barrio-n">{cerca.disponibles.length}</span>}</h2>
+          {emer.estado === "buscando" && !lugar && <p className="atencion-nota">Buscando la dirección…</p>}
+          {emer.estado === "nada" && <p className="emer-aviso">No encontramos «{emer.q}». Probá con calle y altura (Corrientes 1234) o una esquina (Corrientes y Callao). Abajo están los bolsos que coinciden con el texto.</p>}
+          {emer.estado === "error" && <p className="emer-aviso">No se pudo buscar la dirección. Revisá la conexión y probá de nuevo.</p>}
+          {lugar && cerca && (<>
+            <p className="emer-lugar">
+              <span className="emer-pin" aria-hidden="true">🚨</span>
+              <span><b>{lugar.texto}</b>{!lugar.caba && <span className="emer-fuera"> · fuera de la Ciudad</span>}</span>
+              <a className="maps" href={`https://www.google.com/maps/search/?api=1&query=${lugar.lat},${lugar.lng}`} target="_blank" rel="noopener noreferrer">Ver en el mapa</a>
+            </p>
+            {emer.lugares.length > 1 && (
+              <div className="chips emer-otras" role="group" aria-label="Otras direcciones con ese nombre">
+                <span className="emer-otras-label">¿Es otra?</span>
+                {emer.lugares.map((l, i) => <button key={l.texto} className="chip" aria-pressed={i === emer.i} onClick={() => setEmer({ ...emer, i })}>{l.texto}</button>)}
+              </div>
+            )}
+            {cerca.disponibles.length > 0 && (
+              <ul className={`bags ${claseCols}`}>
+                {cerca.disponibles.map((d, i) => card(d.x, true, (
+                  <span className={`dist ${i === 0 ? "primero" : ""}`}>
+                    <span className="dist-m">{i === 0 ? "Más cercano · " : ""}{fmtDist(d.m)}</span>
+                    <span className="dist-min">≈ {minutosCaminando(d.m)} min caminando</span>
+                    <a className="maps dist-link" href={linkComoLlegar(lugar, d.p!)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>Cómo llegar</a>
+                  </span>
+                )))}
+              </ul>
+            )}
+            {ubicando && <p className="atencion-nota">Ubicando los bolsos en el mapa…</p>}
+            {!ubicando && !cerca.disponibles.length && <p className="emer-aviso">No hay bolsos disponibles ahora con dirección ubicable.</p>}
+            {cerca.noDisponibles.length > 0 && (
+              <p className="atencion-nota">Más cerca, pero no disponibles ahora: {cerca.noDisponibles.map((d) =>
+                `${d.x.b.nombre} (${fmtDist(d.m)}, ${d.x.b.fueraDeServicio ? "fuera de servicio" : "cerrado en este horario"})`).join(" · ")}</p>
+            )}
+            {!ubicando && cerca.sinUbicar > 0 && <p className="atencion-nota">{cerca.sinUbicar === 1 ? "1 bolso no tiene" : `${cerca.sinUbicar} bolsos no tienen`} una dirección que se pueda ubicar en el mapa, así que no entra{cerca.sinUbicar === 1 ? "" : "n"} en esta búsqueda.</p>}
+            <p className="atencion-nota">Distancia en línea recta; el tiempo caminando es aproximado.</p>
+          </>)}
+        </section>
+      )}
 
-      {atencion.length > 0 && (
+      {!modoEmergencia && filtrando && !visibles.length && <p className="none" style={{ marginTop: 16 }}>No hay bolsos que coincidan con la búsqueda.</p>}
+
+      {!modoEmergencia && atencion.length > 0 && (
         <section className="barrio atencion">
           <h2 className="barrio-head"><span>Atención</span><span className="barrio-n">{atencion.length}</span></h2>
           <p className="atencion-nota">Fuera de servicio o con faltantes vitales (en rojo)</p>
@@ -361,14 +454,14 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
         </section>
       )}
 
-      {grupos.map((g) => (
+      {!modoEmergencia && grupos.map((g) => (
         <section className="barrio" key={g.barrio}>
           {(grupos.length > 1 || atencion.length > 0 || cerrados.length > 0) && <h2 className="barrio-head"><span>{g.barrio}</span><span className="barrio-n">{g.items.length}</span></h2>}
           <ul className={`bags ${claseCols}`}>{g.items.map((x) => card(x))}</ul>
         </section>
       ))}
 
-      {cerrados.length > 0 && (
+      {!modoEmergencia && cerrados.length > 0 && (
         <section className="barrio cerrados">
           <h2 className="barrio-head"><span>No disponibles en este horario</span><span className="barrio-n">{cerrados.length}</span></h2>
           <p className="atencion-nota">Según el horario de cada lugar. Vuelven solos arriba cuando abren.</p>
@@ -415,7 +508,7 @@ const normalizar = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g,
 const SINONIMOS: Record<string, string[]> = { "11": ["once"], "once": ["11"], "v crespo": ["villa crespo"], "chaca": ["chacarita"] };
 
 /** One bag in the list. In 4-per-row mode the CSS shows only name, status and the service dot. */
-function BagCard({ x, user, toast, onOpen, conBarrio }: { x: Dato; user: User; toast: (m: string) => void; onOpen: (id: string) => void; conBarrio?: boolean }) {
+function BagCard({ x, user, toast, onOpen, conBarrio, extra }: { x: Dato; user: User; toast: (m: string) => void; onOpen: (id: string) => void; conBarrio?: boolean; extra?: React.ReactNode }) {
   const { b, r, av, disp } = x;
   const cerrado = !b.fueraDeServicio && disp.estado === "cerrado";
   const dias = diasDesde(b.actualizado);
@@ -431,6 +524,7 @@ function BagCard({ x, user, toast, onOpen, conBarrio }: { x: Dato; user: User; t
       {/* the whole card opens the bag (stretched button); the service switch sits on top of it */}
       <div className={`bag ${estado} ${cerrado ? "cerrado" : ""}`}>
         <span className="bag-main">
+          {extra}
           {conBarrio && b.barrio && <span className="bag-barrio">{b.barrio}</span>}
           <span className="bag-top">
             <button className="bag-open bag-name" onClick={() => onOpen(b.id)}>{b.nombre}</button>
