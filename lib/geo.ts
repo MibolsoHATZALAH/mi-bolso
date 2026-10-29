@@ -16,6 +16,10 @@ export function pareceDireccion(q: string): boolean {
   return /\p{L}.*\s\d{2,5}\b/u.test(t) || /\p{L}{3,}.*\s(y|e|esq\.?|esquina)\s+\p{L}{3,}/iu.test(t);
 }
 
+/** Spellings the address service doesn't recognize, as they appear in the team's spreadsheet. */
+const CORRECCIONES: [RegExp, string][] = [[/\bbologne\b/gi, "Boulogne"], [/\bbolougne\b/gi, "Boulogne"], [/\bpueyredon\b/gi, "Pueyrredón"]];
+export const corregirCalles = (d: string) => CORRECCIONES.reduce((t, [re, ok]) => t.replace(re, ok), d);
+
 /** Drops floor / apartment ("Piso 3", "Dto B", "1° A") so only street + number is looked up. */
 export const limpiarDireccion = (d: string) =>
   d.replace(/\s*[,(-]?\s*(piso|p\.|dpto|depto|dto|departamento|of(icina)?|local|pb|timbre)\b.*$/i, "").replace(/\s+\d+\s*°.*$/, "").trim();
@@ -66,13 +70,24 @@ export function lugaresUsig(j: UsigJson): Lugar[] {
 
 /** Candidates for an address typed by the dispatcher (several when the street name is ambiguous). */
 export async function buscarLugares(q: string, signal?: AbortSignal): Promise<Lugar[]> {
-  const dir = limpiarDireccion(q);
+  const dir = corregirCalles(limpiarDireccion(q));
+  // a slow service must not freeze the search: give up after 8 s
+  const sig = () => {
+    const A = AbortSignal as typeof AbortSignal & { any?: (s: AbortSignal[]) => AbortSignal; timeout?: (ms: number) => AbortSignal };
+    const t = A.timeout?.(8000); // older iPhones lack these: then only the caller's signal applies
+    return signal && t && A.any ? A.any([signal, t]) : signal ?? t;
+  };
   try {
-    const r = await fetch(`${USIG}?geocodificar=TRUE&srid=4326&maxOptions=8&direccion=${encodeURIComponent(dir)}`, { signal });
-    if (r.ok) { const l = lugaresUsig(await r.json()); if (l.length) return l.slice(0, 5); }
-  } catch (e) { if ((e as Error).name === "AbortError") throw e; }
+    const r = await fetch(`${USIG}?geocodificar=TRUE&srid=4326&maxOptions=8&direccion=${encodeURIComponent(dir)}`, { signal: sig() });
+    if (r.ok) {
+      const l = lugaresUsig(await r.json());
+      // same street name in other towns only matters when the City has no such address
+      const caba = l.filter((x) => x.caba);
+      if (l.length) return (caba.length ? caba : l).slice(0, 5);
+    }
+  } catch (e) { if (signal?.aborted) throw e; }
   // fallback: OpenStreetMap, limited to Argentina
-  const r = await fetch(`${NOMINATIM}?format=jsonv2&limit=3&countrycodes=ar&accept-language=es&q=${encodeURIComponent(`${dir}, Buenos Aires`)}`, { signal });
+  const r = await fetch(`${NOMINATIM}?format=jsonv2&limit=3&countrycodes=ar&accept-language=es&q=${encodeURIComponent(`${dir}, Buenos Aires`)}`, { signal: sig() });
   if (!r.ok) return [];
   const xs = (await r.json()) as { lat: string; lon: string; display_name: string }[];
   return xs.map((x) => ({ lat: Number(x.lat), lng: Number(x.lon), texto: x.display_name.split(",").slice(0, 3).join(","), caba: /Ciudad Autónoma/.test(x.display_name) }))
@@ -87,7 +102,7 @@ function escribirCache(dir: string, p: Punto | null) { try { localStorage.setIte
 
 /** A bag's point from its address. `enCiudad` = the bag's neighborhood is in CABA (not "Otros"). */
 export async function ubicarBolso(direccion: string, enCiudad: boolean): Promise<Punto | null> {
-  const dir = limpiarDireccion(direccion);
+  const dir = corregirCalles(limpiarDireccion(direccion));
   if (!dir || !/\d/.test(dir)) return null;
   const c = leerCache(dir);
   if (c && (c.p || Date.now() - c.t < 864e5)) return c.p; // a failed lookup is retried after a day

@@ -57,3 +57,9 @@ test("nearest available bags first; closer unavailable ones are shown apart", ()
   assert.deepEqual(noDisponibles.map((d) => d.x), ["cerrado"]);
   assert.equal(sinUbicar, 1);
 });
+
+test("spellings from the spreadsheet the address service doesn't know get fixed", async () => {
+  const { corregirCalles } = await import("../lib/geo.ts");
+  assert.equal(corregirCalles("Bologne Sur Mer 647"), "Boulogne Sur Mer 647");
+  assert.equal(corregirCalles("Corrientes 1234"), "Corrientes 1234");
+});

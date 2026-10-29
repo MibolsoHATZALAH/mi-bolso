@@ -270,17 +270,17 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
   // where each bag is: saved on the bag, or looked up from its address (management saves it for everyone)
   const clave = (b: BolsoInst) => `${b.id}|${b.direccion.trim()}`;
   const puntosRef = useRef<Record<string, Punto | null>>({});
+  const enCurso = useRef(new Set<string>());
   const [puntos, setPuntos] = useState<Record<string, Punto | null>>({});
-  const [ubicando, setUbicando] = useState(false);
   const hayLugar = !!lugar;
+  const ubicando = hayLugar && bolsos.some((b) => !(clave(b) in puntos));
   useEffect(() => {
     if (!hayLugar) return;
-    let vivo = true;
-    const cola = bolsos.filter((b) => !(clave(b) in puntosRef.current));
-    if (!cola.length) { setUbicando(false); return; }
-    setUbicando(true);
+    const cola = bolsos.filter((b) => !(clave(b) in puntosRef.current) && !enCurso.current.has(clave(b)));
+    if (!cola.length) return;
     const trabajar = async () => {
       for (let b = cola.shift(); b; b = cola.shift()) {
+        enCurso.current.add(clave(b));
         const dir = b.direccion.trim();
         let p: Punto | null = b.geo && b.geo.dir === dir ? { lat: b.geo.lat, lng: b.geo.lng } : null;
         if (!p && dir) {
@@ -288,11 +288,11 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
           if (p && gerencia) guardarGeo(b.id, { ...p, dir }).catch(() => {});
         }
         puntosRef.current[clave(b)] = p;
-        if (vivo) setPuntos({ ...puntosRef.current });
+        enCurso.current.delete(clave(b));
+        setPuntos({ ...puntosRef.current });
       }
     };
-    Promise.all([1, 2, 3, 4].map(trabajar)).then(() => { if (vivo) setUbicando(false); });
-    return () => { vivo = false; };
+    [1, 2, 3, 4].forEach(() => { trabajar().catch(() => {}); });
   }, [hayLugar, bolsos, gerencia]);
 
   // filter: neighborhood chip + search box (neighborhood, name or address; "11" finds Once)
@@ -438,7 +438,13 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
               <p className="atencion-nota">Más cerca, pero no disponibles ahora: {cerca.noDisponibles.map((d) =>
                 `${d.x.b.nombre} (${fmtDist(d.m)}, ${d.x.b.fueraDeServicio ? "fuera de servicio" : "cerrado en este horario"})`).join(" · ")}</p>
             )}
-            {!ubicando && cerca.sinUbicar > 0 && <p className="atencion-nota">{cerca.sinUbicar === 1 ? "1 bolso no tiene" : `${cerca.sinUbicar} bolsos no tienen`} una dirección que se pueda ubicar en el mapa, así que no entra{cerca.sinUbicar === 1 ? "" : "n"} en esta búsqueda.</p>}
+            {!ubicando && cerca.sinUbicar > 0 && (
+              <details className="atencion-nota sin-ubicar">
+                <summary>{cerca.sinUbicar === 1 ? "1 bolso no tiene" : `${cerca.sinUbicar} bolsos no tienen`} una dirección que se pueda ubicar en el mapa, así que no entra{cerca.sinUbicar === 1 ? "" : "n"} en esta búsqueda</summary>
+                {datos.filter((x) => !puntos[clave(x.b)]).map((x) => `${x.b.nombre}${x.b.direccion ? ` (${x.b.direccion})` : " (sin dirección)"}`).join(" · ")}
+                {gerencia && <> — Corregí la dirección de cada uno (calle y número) desde el bolso.</>}
+              </details>
+            )}
             <p className="atencion-nota">Distancia en línea recta; el tiempo caminando es aproximado.</p>
           </>)}
         </section>
