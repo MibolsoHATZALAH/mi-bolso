@@ -101,3 +101,31 @@ export function textoDisponibilidad(d: Disponibilidad, now = new Date()): string
   if (d.estado === "cerrado") return d.abre ? `Abre ${cuando(d.abre, now)}` : "Sin horario de apertura";
   return "";
 }
+
+/* ---------- how the app understood a schedule (shown next to the text in "Horarios") ---------- */
+const CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const ORDEN = [1, 2, 3, 4, 5, 6, 0]; // Monday first
+const hora = (m: number) => (m % 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}` : String(m / 60));
+
+/** "Lun a Jue 7 a 22 · Vie 7 a 16 · Sáb y Dom cerrado", "Todos los días, las 24 hs", or "" when not understood. */
+export function describirHorario(h: Horario): string {
+  if (h.tipo === "desconocido") return "";
+  if (h.siempre) return "Todos los días, las 24 hs";
+  const deDia = (d: number) => {
+    const fs = h.franjas.filter((f) => f.dia === d).sort((a, b) => a.desde - b.desde);
+    // merge touching slots ("0 a 24" written as two halves, past-midnight pieces)
+    const m: Franja[] = [];
+    for (const f of fs) { const u = m[m.length - 1]; if (u && f.desde <= u.hasta) u.hasta = Math.max(u.hasta, f.hasta); else m.push({ ...f }); }
+    if (!m.length) return "cerrado";
+    if (m.length === 1 && m[0].desde === 0 && m[0].hasta >= 1440) return "las 24 hs";
+    return m.map((f) => `${hora(f.desde)} a ${hora(f.hasta)}`).join(" y ");
+  };
+  const grupos: { dias: number[]; txt: string }[] = [];
+  for (const d of ORDEN) {
+    const txt = deDia(d), u = grupos[grupos.length - 1];
+    if (u && u.txt === txt) u.dias.push(d); else grupos.push({ dias: [d], txt });
+  }
+  if (grupos.length === 1) return `Todos los días ${grupos[0].txt}`;
+  const nombre = (ds: number[]) => ds.length === 1 ? CORTO[ds[0]] : ds.length === 2 ? `${CORTO[ds[0]]} y ${CORTO[ds[1]]}` : `${CORTO[ds[0]]} a ${CORTO[ds[ds.length - 1]]}`;
+  return grupos.map((g) => `${nombre(g.dias)} ${g.txt}`).join(" · ");
+}

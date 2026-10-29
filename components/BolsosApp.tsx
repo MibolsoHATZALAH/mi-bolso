@@ -4,7 +4,7 @@ import { signOut, type User } from "firebase/auth";
 import { fb } from "@/lib/firebase";
 import { alertasVenc, buildCopyTextVarios, resumen, type Bolso, type CambioLista } from "@/lib/inventory";
 import {
-  ADMINS, agregarMiembro, aplicarListaEnOtros, cambiarEquipos, guardarGeo, cambiarNombre, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
+  ADMINS, agregarMiembro, aplicarListaEnOtros, cambiarEquipos, cambiarHorario, guardarGeo, cambiarNombre, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
   quitarMiembro, rechazar, subscribeAcceso, subscribeBolsos, subscribeEquipo, subscribeSolicitudes,
   type Acceso, type BolsoInst, type DatosBolso, type Miembro, type Rol, type Solicitud,
 } from "@/lib/bolsos";
@@ -12,16 +12,17 @@ import InventoryApp from "./InventoryApp";
 import { UserChip } from "./Login";
 import AlarmasPush from "./AlarmasPush";
 import { BARRIOS, EQUIPOS, type EquipoId } from "@/lib/config";
-import { disponibilidad, leerHorario, textoDisponibilidad, type Disponibilidad } from "@/lib/horario";
+import { describirHorario, disponibilidad, leerHorario, textoDisponibilidad, type Disponibilidad } from "@/lib/horario";
 import { buscarLugares, cercanos, fmtDist, linkComoLlegar, minutosCaminando, pareceDireccion, ubicarBolso, type Lugar, type Punto } from "@/lib/geo";
 
 const STALE_DAYS = 30; // a bag nobody has checked in this long gets flagged
-type Vista = { k: "lista" } | { k: "bolso"; id: string } | { k: "equipo" };
+type Vista = { k: "lista" } | { k: "bolso"; id: string } | { k: "equipo" } | { k: "horarios" };
 
 function leerVista(): Vista {
   if (typeof window === "undefined") return { k: "lista" };
   const h = window.location.hash.replace(/^#/, "");
   if (h === "equipo") return { k: "equipo" };
+  if (h === "horarios") return { k: "horarios" };
   if (h.startsWith("b/") && h.length > 2) return { k: "bolso", id: decodeURIComponent(h.slice(2)) };
   return { k: "lista" };
 }
@@ -84,7 +85,7 @@ function BolsosApp({ user, rol }: { user: User; rol: Rol }) {
   useEffect(() => subscribeBolsos(setBolsos, (e) => setError(e.message)), []);
   useEffect(() => (gerencia ? subscribeSolicitudes(setSolicitudes, () => {}) : undefined), [gerencia]);
 
-  const ir = (v: Vista) => { window.location.hash = v.k === "lista" ? "" : v.k === "equipo" ? "equipo" : `b/${encodeURIComponent(v.id)}`; };
+  const ir = (v: Vista) => { window.location.hash = v.k === "lista" ? "" : v.k === "bolso" ? `b/${encodeURIComponent(v.id)}` : v.k; };
   const chip = <UserChip user={user} onSignOut={() => signOut(fb().auth)} />;
 
   if (error) return <div className="splash" style={{ padding: 16, textAlign: "center" }}>No se pudieron cargar los bolsos ({error}).</div>;
@@ -109,8 +110,10 @@ function BolsosApp({ user, rol }: { user: User; rol: Rol }) {
     <>
       {vista.k === "equipo" && gerencia
         ? <Equipo user={user} solicitudes={solicitudes} chip={chip} onBack={() => ir({ k: "lista" })} toast={toast} />
+        : vista.k === "horarios" && gerencia
+        ? <Horarios bolsos={bolsos} chip={chip} onBack={() => ir({ k: "lista" })} onOpen={(id) => ir({ k: "bolso", id })} toast={toast} />
         : <Lista bolsos={bolsos} user={user} gerencia={gerencia} pendientes={solicitudes.length} chip={chip} alarmas={<AlarmasPush user={user} app="bolsos" />}
-            onOpen={(id) => ir({ k: "bolso", id })} onEquipo={() => ir({ k: "equipo" })} toast={toast} />}
+            onOpen={(id) => ir({ k: "bolso", id })} onEquipo={() => ir({ k: "equipo" })} onHorarios={() => ir({ k: "horarios" })} toast={toast} />}
       <div className={`toast ${toastMsg ? "show" : ""}`} role="status">{toastMsg}</div>
     </>
   );
@@ -221,9 +224,9 @@ function BolsoView({ b, bolsos, user, gerencia, chip, onBack, toast }: {
 }
 
 /* ---------- List of bags = state of every bag ---------- */
-function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, toast }: {
+function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, onHorarios, toast }: {
   bolsos: BolsoInst[]; user: User; gerencia: boolean; pendientes: number; chip: React.ReactNode; alarmas: React.ReactNode;
-  onOpen: (id: string) => void; onEquipo: () => void; toast: (m: string) => void;
+  onOpen: (id: string) => void; onEquipo: () => void; onHorarios: () => void; toast: (m: string) => void;
 }) {
   const [nuevo, setNuevo] = useState(false);
   const [copyFallback, setCopyFallback] = useState("");
@@ -360,6 +363,7 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
         <div className="toolbar">
           <button className="btn primary" onClick={() => setNuevo(!nuevo)}>{nuevo ? "Cancelar" : "Agregar bolso"}</button>
           <button className="btn" onClick={onEquipo}>Equipo{pendientes > 0 && <span className="cnt">{pendientes}</span>}</button>
+          <button className="btn" onClick={onHorarios}>Horarios</button>
           <button className="btn" onClick={copiar} disabled={!bolsos.length}>Copiar lista para reponer</button>
         </div>
       )}
@@ -759,3 +763,75 @@ function Equipo({ user, solicitudes, chip, onBack, toast }: {
     </div>
   );
 }
+
+/* ---------- Horarios: one table to fix every bag's opening hours ---------- */
+function Horarios({ bolsos, chip, onBack, onOpen, toast }: {
+  bolsos: BolsoInst[]; chip: React.ReactNode; onBack: () => void; onOpen: (id: string) => void; toast: (m: string) => void;
+}) {
+  const [soloDudosos, setSoloDudosos] = useState(false);
+  const [ahora, setAhora] = useState(() => new Date());
+  useEffect(() => { const t = setInterval(() => setAhora(new Date()), 30_000); return () => clearInterval(t); }, []);
+  const rank = (k: string) => { const i = BARRIOS.findIndex((x) => x.toLowerCase() === k.toLowerCase()); return i < 0 ? 1e3 : i; };
+  const dudoso = (b: BolsoInst) => leerHorario(b.horario).tipo === "desconocido";
+  const lista = bolsos.filter((b) => !soloDudosos || dudoso(b))
+    .sort((a, b) => rank(a.barrio.trim() || "zzz") - rank(b.barrio.trim() || "zzz") || a.nombre.localeCompare(b.nombre, "es", { numeric: true }));
+  const nDudosos = bolsos.filter(dudoso).length;
+  const guardar = (b: BolsoInst, v: string) => {
+    if (v.trim() === b.horario.trim()) return;
+    cambiarHorario(b.id, v).then(() => toast(`${b.nombre}: horario guardado`)).catch(() => toast("No se pudo guardar. Revisá la conexión."));
+  };
+
+  return (
+    <div className="wrap ancho">
+      <header className="band">
+        <button className="backlink" onClick={onBack}>‹ Todos los bolsos</button>
+        <div className="band-top"><div className="titles"><h1>Horarios</h1><span className="subtitle">Cuándo está disponible cada bolso</span></div>{chip}</div>
+      </header>
+
+      <section className="summary clear horarios-ayuda">
+        <p>Escribí el horario de cada bolso y tocá fuera del casillero (o Enter): se guarda solo y cambia al instante en los celulares de todo el equipo. Al lado ves <b>cómo lo entendió la app</b>; si no lo entiende, el bolso se muestra siempre como disponible.</p>
+        <p className="horarios-ej">Ejemplos: <code>24 hs</code> · <code>L a V de 8 a 20</code> · <code>L a J de 7 a 22 y V de 7 a 16</code> · <code>L a D de 8 a 12 y 19 a 22</code> · <code>V de 20 a 2</code> · <code>A confirmar</code></p>
+      </section>
+
+      <div className="toolbar vista">
+        <span className="vista-label">{bolsos.length} bolsos{nDudosos > 0 && <> · <b className="txt-warn">{nDudosos} sin horario claro</b></>}</span>
+        <div className="seg-filter" role="group" aria-label="Mostrar">
+          <button aria-pressed={!soloDudosos} onClick={() => setSoloDudosos(false)}>Todos</button>
+          <button aria-pressed={soloDudosos} onClick={() => setSoloDudosos(true)}>Sin horario claro</button>
+        </div>
+      </div>
+
+      <div className="tabla-scroll">
+        <table className="tabla-horarios">
+          <thead><tr><th>Bolso</th><th>Horario</th><th>Cómo lo entiende la app</th><th>Ahora</th></tr></thead>
+          <tbody>
+            {lista.map((b) => {
+              const h = leerHorario(b.horario), desc = describirHorario(h), disp = disponibilidad(h, ahora);
+              return (
+                <tr key={b.id} className={desc ? "" : "dudoso"}>
+                  <td className="th-bolso">
+                    <button className="link-btn" onClick={() => onOpen(b.id)}>{b.nombre}</button>
+                    {b.barrio && <span className="bag-barrio">{b.barrio}</span>}
+                  </td>
+                  <td>
+                    <input type="text" key={`${b.id}-${b.horario}`} defaultValue={b.horario} placeholder="Ej.: L a V de 8 a 20" aria-label={`Horario de ${b.nombre}`}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { (e.target as HTMLInputElement).value = b.horario; (e.target as HTMLInputElement).blur(); } }}
+                      onBlur={(e) => guardar(b, e.target.value)} />
+                    <span className="h-rapidos">
+                      <button className="chip mini" onClick={() => guardar(b, "24 hs")}>24 hs</button>
+                      <button className="chip mini" onClick={() => guardar(b, "A confirmar")}>A confirmar</button>
+                    </span>
+                  </td>
+                  <td className="th-desc">{desc || <span className="txt-warn">{b.horario.trim() ? "No se entiende: se muestra siempre disponible" : "Sin horario: se muestra siempre disponible"}</span>}</td>
+                  <td className={`th-ahora ${disp.estado}`}>{disp.estado === "abierto" ? "Disponible" : disp.estado === "cerrado" ? "Cerrado" : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {!lista.length && <p className="none">Todos los bolsos tienen un horario que la app entiende.</p>}
+    </div>
+  );
+}
+

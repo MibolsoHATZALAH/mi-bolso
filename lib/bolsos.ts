@@ -124,6 +124,8 @@ export const editarBolso = (id: string, datos: DatosBolso) => updateDoc(bolsoRef
 /** Which extra equipment the place has (management). */
 export const cambiarEquipos = (id: string, equipos: EquipoId[]) => updateDoc(bolsoRef(id), { equipos });
 export const borrarBolso = (id: string) => deleteDoc(bolsoRef(id));
+/** Opening hours of one bag (management, from the "Horarios" table). */
+export const cambiarHorario = (id: string, horario: string) => updateDoc(bolsoRef(id), { horario: horario.trim() });
 /** Saves where a bag is for the address it has now (management; everyone else reads it). */
 export const guardarGeo = (id: string, geo: { lat: number; lng: number; dir: string }) => updateDoc(bolsoRef(id), { geo });
 

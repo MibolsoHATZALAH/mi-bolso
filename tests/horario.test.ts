@@ -82,3 +82,15 @@ test("past midnight", () => {
   assert.equal(abierto(h, `${SAB}T01:30`), "abierto");
   assert.equal(abierto(h, `${SAB}T02:30`), "cerrado");
 });
+
+test("how a schedule reads back in the Horarios table", async () => {
+  const { describirHorario } = await import("../lib/horario.ts");
+  const d = (t: string) => describirHorario(leerHorario(t));
+  assert.equal(d("24 hs"), "Todos los días, las 24 hs");
+  assert.equal(d("L a J de 7 a 22 y V de 7 a 16"), "Lun a Jue 7 a 22 · Vie 7 a 16 · Sáb y Dom cerrado");
+  assert.equal(d("L a V 9:30 a 18"), "Lun a Vie 9:30 a 18 · Sáb y Dom cerrado");
+  assert.equal(d("6 a 22"), "Todos los días 6 a 22");
+  assert.equal(d("L a D de 8 a 12 y 19 a 20"), "Todos los días 8 a 12 y 19 a 20");
+  assert.equal(d("A confirmar"), "");
+  assert.equal(d(""), "");
+});

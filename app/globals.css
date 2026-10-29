@@ -591,3 +591,26 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 .bags.cuatro .dist{font-size:11px;gap:2px 6px}
 .bags.cuatro .dist-m{font-size:14px}
 .bags.cuatro .dist-min{display:none}
+
+/* ---- Horarios table (management) ---- */
+.horarios-ayuda p{margin:0 0 8px;font-size:15px}
+.horarios-ej{color:var(--muted);font-size:14px!important;line-height:1.8}
+.horarios-ej code{background:var(--fill);border-radius:6px;padding:2px 6px;font-size:13px;white-space:nowrap}
+.txt-warn{color:var(--orange)}
+.tabla-scroll{overflow-x:auto;margin-top:8px;border-radius:18px;border:.5px solid var(--glass-edge);background:var(--glass);box-shadow:var(--shadow)}
+.tabla-horarios{width:100%;border-collapse:collapse;font-size:15px;min-width:720px}
+.tabla-horarios th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:12px 12px 8px;border-bottom:.5px solid var(--line)}
+.tabla-horarios td{padding:10px 12px;border-bottom:.5px solid var(--line);vertical-align:top}
+.tabla-horarios tr:last-child td{border-bottom:0}
+.tabla-horarios tr.dudoso{background:color-mix(in srgb,var(--orange) 8%,transparent)}
+.tabla-horarios .th-bolso{min-width:150px}
+.tabla-horarios .th-bolso .link-btn{font-weight:700;font-size:15px;text-align:left;padding:0}
+.tabla-horarios .th-bolso .bag-barrio{display:block;margin-top:2px}
+.tabla-horarios input{width:100%;min-width:220px;border:0;background:var(--fill);border-radius:10px;padding:9px 10px;font-size:16px;color:var(--ink)}
+.tabla-horarios .h-rapidos{display:flex;gap:6px;margin-top:6px}
+.chip.mini{padding:3px 10px;font-size:12px}
+.tabla-horarios .th-desc{color:var(--ink);font-size:14px;min-width:200px}
+.tabla-horarios .th-ahora{font-weight:700;white-space:nowrap}
+.tabla-horarios .th-ahora.abierto{color:var(--ok)}
+.tabla-horarios .th-ahora.cerrado{color:var(--bad)}
+.tabla-horarios .th-ahora.desconocido{color:var(--muted)}
