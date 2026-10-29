@@ -4,7 +4,7 @@ import { signOut, type User } from "firebase/auth";
 import { fb } from "@/lib/firebase";
 import { alertasVenc, buildCopyTextVarios, resumen, type Bolso, type CambioLista } from "@/lib/inventory";
 import {
-  ADMINS, agregarMiembro, aplicarListaEnOtros, cambiarEquipos, cambiarHorario, esAdmin, guardarGeo, cambiarNombre, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
+  ADMINS, agregarMiembro, aplicarListaEnOtros, asignarBolsos, cambiarEquipos, cambiarHorario, esAdmin, guardarGeo, cambiarNombre, aprobar, bolsoStore, cambiarServicio, linkMaps, copiarListaATodos, borrarBolso, cambiarRol, crearBolso, editarBolso, emailDe,
   quitarMiembro, rechazar, subscribeAcceso, subscribeBolsos, subscribeEquipo, subscribeSolicitudes,
   type Acceso, type BolsoInst, type DatosBolso, type Miembro, type Rol, type Solicitud,
 } from "@/lib/bolsos";
@@ -61,11 +61,13 @@ export default function BolsosGate({ user }: { user: User }) {
       <button className="btn" onClick={salir}>Entrar con otra cuenta</button>
     </div></div>
   );
-  return <BolsosApp user={user} rol={acceso.rol} />;
+  return <BolsosApp user={user} rol={acceso.rol} misBolsos={acceso.bolsos} />;
 }
 
-function BolsosApp({ user, rol }: { user: User; rol: Rol }) {
+function BolsosApp({ user, rol, misBolsos }: { user: User; rol: Rol; misBolsos: string[] }) {
   const gerencia = rol === "gerencia";
+  const encargado = rol === "encargado";
+  const clavesMias = misBolsos.join("|"); // re-subscribe when the administrator changes their bags
   const [vista, setVista] = useState<Vista>({ k: "lista" });
   const [bolsos, setBolsos] = useState<BolsoInst[] | null>(null);
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
@@ -82,7 +84,7 @@ function BolsosApp({ user, rol }: { user: User; rol: Rol }) {
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);
-  useEffect(() => subscribeBolsos(setBolsos, (e) => setError(e.message)), []);
+  useEffect(() => subscribeBolsos(setBolsos, (e) => setError(e.message), encargado ? misBolsos : undefined), [encargado, clavesMias]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => (gerencia ? subscribeSolicitudes(setSolicitudes, () => {}) : undefined), [gerencia]);
 
   const ir = (v: Vista) => { window.location.hash = v.k === "lista" ? "" : v.k === "bolso" ? `b/${encodeURIComponent(v.id)}` : v.k; };
@@ -109,10 +111,10 @@ function BolsosApp({ user, rol }: { user: User; rol: Rol }) {
   return (
     <>
       {vista.k === "equipo" && gerencia
-        ? <Equipo user={user} solicitudes={solicitudes} chip={chip} onBack={() => ir({ k: "lista" })} toast={toast} />
+        ? <Equipo user={user} bolsos={bolsos} solicitudes={solicitudes} chip={chip} onBack={() => ir({ k: "lista" })} toast={toast} />
         : vista.k === "horarios" && esAdmin(user)
         ? <Horarios bolsos={bolsos} chip={chip} onBack={() => ir({ k: "lista" })} onOpen={(id) => ir({ k: "bolso", id })} toast={toast} />
-        : <Lista bolsos={bolsos} user={user} gerencia={gerencia} pendientes={solicitudes.length} chip={chip} alarmas={<AlarmasPush user={user} app="bolsos" />}
+        : <Lista bolsos={bolsos} user={user} gerencia={gerencia} encargado={encargado} pendientes={solicitudes.length} chip={chip} alarmas={<AlarmasPush user={user} app="bolsos" />}
             onOpen={(id) => ir({ k: "bolso", id })} onEquipo={() => ir({ k: "equipo" })} onHorarios={() => ir({ k: "horarios" })} toast={toast} />}
       <div className={`toast ${toastMsg ? "show" : ""}`} role="status">{toastMsg}</div>
     </>
@@ -224,8 +226,8 @@ function BolsoView({ b, bolsos, user, gerencia, chip, onBack, toast }: {
 }
 
 /* ---------- List of bags = state of every bag ---------- */
-function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEquipo, onHorarios, toast }: {
-  bolsos: BolsoInst[]; user: User; gerencia: boolean; pendientes: number; chip: React.ReactNode; alarmas: React.ReactNode;
+function Lista({ bolsos, user, gerencia, encargado, pendientes, chip, alarmas, onOpen, onEquipo, onHorarios, toast }: {
+  bolsos: BolsoInst[]; user: User; gerencia: boolean; encargado: boolean; pendientes: number; chip: React.ReactNode; alarmas: React.ReactNode;
   onOpen: (id: string) => void; onEquipo: () => void; onHorarios: () => void; toast: (m: string) => void;
 }) {
   const [nuevo, setNuevo] = useState(false);
@@ -354,7 +356,7 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
             const t = Date.now(), c = toques.current;
             c.n = t - c.t < 1500 ? c.n + 1 : 1; c.t = t;
             if (c.n >= 5) { c.n = 0; onHorarios(); }
-          }}>Bolsos</h1><span className="subtitle">{gerencia ? "Gerencia · estado de todos los bolsos" : "Bolsos de la institución"}</span></div>
+          }}>Bolsos</h1><span className="subtitle">{gerencia ? "Gerencia · estado de todos los bolsos" : encargado ? "Los bolsos a tu cargo" : "Bolsos de la institución"}</span></div>
           {chip}
         </div>
         <div className={`meter ${fueraN ? "cuatro" : ""}`}>
@@ -383,7 +385,9 @@ function Lista({ bolsos, user, gerencia, pendientes, chip, alarmas, onOpen, onEq
 
       {!bolsos.length && !nuevo && (
         <p className="none" style={{ marginTop: 16 }}>
-          {gerencia ? "Todavía no hay bolsos. Tocá “Agregar bolso” para cargar el primero (por ejemplo, el de la sede o el de un vehículo)." : "Todavía no hay bolsos cargados. La gerencia los agrega desde su cuenta."}
+          {gerencia ? "Todavía no hay bolsos. Tocá “Agregar bolso” para cargar el primero (por ejemplo, el de la sede o el de un vehículo)."
+            : encargado ? "Todavía no tenés bolsos a cargo. El administrador te los asigna; aparecen acá solos."
+            : "Todavía no hay bolsos cargados. La gerencia los agrega desde su cuenta."}
         </p>
       )}
 
@@ -666,9 +670,11 @@ function CamposBolso({ id, datos, bolsos, onChange, onCommit }: {
 }
 
 /* ---------- Team: who can use the shared bags ---------- */
-function Equipo({ user, solicitudes, chip, onBack, toast }: {
-  user: User; solicitudes: Solicitud[]; chip: React.ReactNode; onBack: () => void; toast: (m: string) => void;
+function Equipo({ user, bolsos, solicitudes, chip, onBack, toast }: {
+  user: User; bolsos: BolsoInst[]; solicitudes: Solicitud[]; chip: React.ReactNode; onBack: () => void; toast: (m: string) => void;
 }) {
+  const soyAdmin = esAdmin(user); // only the administrator names encargados and gives them bags
+  const [abierto, setAbierto] = useState<string | null>(null);
   const [miembros, setMiembros] = useState<Miembro[] | null>(null);
   const [email, setEmail] = useState("");
   const [nombreNuevo, setNombreNuevo] = useState("");
@@ -714,6 +720,7 @@ function Equipo({ user, solicitudes, chip, onBack, toast }: {
               <div className="opts">
                 <button className="btn primary" onClick={() => aprobar(s, "voluntario", user).then(() => toast(`${s.nombre || s.email} ya tiene acceso`)).catch(err)}>Aprobar</button>
                 <button className="btn" onClick={() => aprobar(s, "gerencia", user).then(() => toast(`${s.nombre || s.email} es gerencia`)).catch(err)}>Como gerencia</button>
+                {soyAdmin && <button className="btn" onClick={() => aprobar(s, "encargado", user).then(() => { toast(`${s.nombre || s.email} es encargado: elegí sus bolsos abajo`); setAbierto(s.email); }).catch(err)}>Como encargado</button>}
                 <button className="btn danger" onClick={() => rechazar(s.email).then(() => toast("Pedido rechazado")).catch(err)}>Rechazar</button>
               </div>
             </li>
@@ -730,29 +737,69 @@ function Equipo({ user, solicitudes, chip, onBack, toast }: {
               <span className="pill info">Administrador</span>
             </li>
           ))}
-          {miembros?.filter((m) => !ADMINS.includes(m.email)).map((m) => (
-            <li className="row" key={m.email}>
-              <div className="name">{campoNombre(m.email, m.nombre)}<span className="sub"><span className="of">{m.email}</span></span></div>
-              <div className="opts">
-                <select aria-label={`Rol de ${m.email}`} value={m.rol} onChange={(e) => cambiarRol(m.email, e.target.value as Rol).then(() => toast("Rol actualizado")).catch(err)}>
-                  <option value="voluntario">Voluntario</option>
-                  <option value="gerencia">Gerencia</option>
-                </select>
-                {quitar === m.email
-                  ? <><button className="btn danger" onClick={() => { quitarMiembro(m.email).then(() => toast("Acceso quitado")).catch(err); setQuitar(null); }}>Confirmar</button><button className="btn" onClick={() => setQuitar(null)}>No</button></>
-                  : <button className="btn danger" onClick={() => setQuitar(m.email)}>Quitar</button>}
+          {miembros?.filter((m) => !ADMINS.includes(m.email)).map((m) => {
+            const esEnc = m.rol === "encargado";
+            const tocable = soyAdmin || !esEnc; // management can't change encargados
+            const suyos = bolsos.filter((b) => m.bolsos.includes(b.id));
+            return (
+            <li className={`row ${esEnc ? "encargado" : ""}`} key={m.email}>
+              <div className="name">
+                {tocable ? campoNombre(m.email, m.nombre) : <span>{m.nombre || m.email}</span>}
+                <span className="sub"><span className="of">{m.email}</span></span>
+                {esEnc && (
+                  <span className="sub enc-resumen">
+                    {suyos.length ? <>A cargo de: <b>{suyos.map((b) => b.nombre).join(" · ")}</b></> : <span className="txt-warn">Sin bolsos asignados todavía</span>}
+                    {soyAdmin && <button className="link-btn" onClick={() => setAbierto(abierto === m.email ? null : m.email)}>{abierto === m.email ? "Listo" : "Elegir bolsos"}</button>}
+                  </span>
+                )}
               </div>
+              <div className="opts">
+                {tocable ? (
+                  <select aria-label={`Rol de ${m.email}`} value={m.rol} onChange={(e) => {
+                    const r = e.target.value as Rol;
+                    cambiarRol(m.email, r, m.rol).then(() => { toast("Rol actualizado"); if (r === "encargado") setAbierto(m.email); }).catch(err);
+                  }}>
+                    <option value="voluntario">Voluntario / despacho</option>
+                    <option value="gerencia">Gerencia</option>
+                    {soyAdmin && <option value="encargado">Encargado</option>}
+                  </select>
+                ) : <span className="pill info">Encargado</span>}
+                {tocable && (quitar === m.email
+                  ? <><button className="btn danger" onClick={() => { quitarMiembro(m.email).then(() => toast("Acceso quitado")).catch(err); setQuitar(null); }}>Confirmar</button><button className="btn" onClick={() => setQuitar(null)}>No</button></>
+                  : <button className="btn danger" onClick={() => setQuitar(m.email)}>Quitar</button>)}
+              </div>
+              {soyAdmin && esEnc && abierto === m.email && (
+                <div className="enc-bolsos" role="group" aria-label={`Bolsos a cargo de ${m.nombre || m.email}`}>
+                  {[...bolsos].sort((a, b) => (a.barrio || "zz").localeCompare(b.barrio || "zz", "es") || a.nombre.localeCompare(b.nombre, "es", { numeric: true })).map((b) => {
+                    const on = m.bolsos.includes(b.id);
+                    return (
+                      <label key={b.id} className={`enc-bolso ${on ? "on" : ""}`}>
+                        <input type="checkbox" checked={on} onChange={() => {
+                          const ids = on ? m.bolsos.filter((x) => x !== b.id) : [...m.bolsos, b.id];
+                          asignarBolsos(m.email, ids).then(() => toast(`${b.nombre}: ${on ? "quitado" : "asignado"} a ${m.nombre || m.email}`)).catch(err);
+                        }} />
+                        <span>{b.nombre}{b.barrio && <span className="enc-barrio"> · {b.barrio}</span>}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
             </li>
-          ))}
+            );
+          })}
         </ul>
-        <p className="empty-note small-note"><b>Voluntario:</b> ve todos los bolsos, registra usos y reposiciones. <b>Gerencia:</b> además agrega o elimina bolsos, edita las listas y maneja el equipo.</p>
+        <p className="empty-note small-note"><b>Voluntario / despacho:</b> ve todos los bolsos, registra usos y reposiciones. <b>Encargado:</b> lo mismo, pero sólo en los bolsos que le asigna el administrador; los demás no los ve. <b>Gerencia:</b> ve todo, agrega o elimina bolsos, edita la lista de elementos y maneja el equipo.</p>
       </section>
 
       <form className="cat" onSubmit={(e) => {
         e.preventDefault();
         const v = email.trim().toLowerCase();
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return toast("Escribí un email válido");
-        agregarMiembro(v, rolNuevo, user, nombreNuevo).then(() => { toast(`${nombreNuevo.trim() || v} ya tiene acceso`); setEmail(""); setNombreNuevo(""); }).catch(err);
+        agregarMiembro(v, rolNuevo, user, nombreNuevo).then(() => {
+          toast(rolNuevo === "encargado" ? `${nombreNuevo.trim() || v} es encargado: elegí sus bolsos arriba` : `${nombreNuevo.trim() || v} ya tiene acceso`);
+          if (rolNuevo === "encargado") setAbierto(v);
+          setEmail(""); setNombreNuevo("");
+        }).catch(err);
       }}>
         <div className="cat-head"><h3>Agregar por email</h3></div>
         <p className="empty-note small-note">Si ya sabés el Gmail de la persona, dale acceso directo sin esperar el pedido.</p>
@@ -760,8 +807,9 @@ function Equipo({ user, solicitudes, chip, onBack, toast }: {
           <input type="text" id="eq-nombre" placeholder="Nombre y apellido" value={nombreNuevo} onChange={(e) => setNombreNuevo(e.target.value)} aria-label="Nombre" />
           <input type="email" id="eq-email" placeholder="nombre@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Email" />
           <select id="eq-rol" value={rolNuevo} onChange={(e) => setRolNuevo(e.target.value as Rol)} aria-label="Rol">
-            <option value="voluntario">Voluntario</option>
+            <option value="voluntario">Voluntario / despacho</option>
             <option value="gerencia">Gerencia</option>
+            {soyAdmin && <option value="encargado">Encargado</option>}
           </select>
           <button className="btn primary">Agregar</button>
         </div>

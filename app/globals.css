@@ -614,3 +614,12 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 .tabla-horarios .th-ahora.abierto{color:var(--ok)}
 .tabla-horarios .th-ahora.cerrado{color:var(--bad)}
 .tabla-horarios .th-ahora.desconocido{color:var(--muted)}
+
+/* ---- encargados: bags assigned to each one (Equipo, administrator) ---- */
+.rows .row.encargado{flex-wrap:wrap}
+.enc-resumen{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font-size:14px;color:var(--ink)}
+.enc-bolsos{flex:1 1 100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px;margin-top:8px;padding:10px;border-radius:14px;background:var(--fill)}
+.enc-bolso{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:10px;font-size:15px;cursor:pointer;background:var(--glass)}
+.enc-bolso.on{outline:2px solid var(--accent);font-weight:600}
+.enc-bolso input{width:18px;height:18px;accent-color:var(--accent)}
+.enc-barrio{color:var(--muted);font-weight:400;font-size:13px}

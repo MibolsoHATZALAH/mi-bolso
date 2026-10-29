@@ -35,9 +35,17 @@ const personales: Personal[] = personalSnap.docs
   .filter((d) => d.id === "actual" && d.ref.parent.parent?.parent.id === "users")
   .map((d) => { const uid = d.ref.parent.parent!.id; return { uid, bolso: toBolso(d.data()), ultimoVenc: estado.get(`personal_${uid}`)?.ultimoVenc }; });
 
+// encargados: who looks after each bag
+const encargadosDe = new Map<string, string[]>();
+for (const d of equipoSnap.docs) {
+  const x = d.data();
+  if (x.rol !== "encargado" || !Array.isArray(x.bolsos)) continue;
+  for (const id of x.bolsos) encargadosDe.set(id, [...(encargadosDe.get(id) ?? []), d.id.toLowerCase()]);
+}
+
 const compartidos: Compartido[] = bolsosSnap.docs.map((d) => {
   const x = d.data(), e = estado.get(`bolso_${d.id}`) ?? {};
-  return { id: d.id, nombre: x.nombre ?? "Bolso", bolso: toBolso(x), ultimoPorEmail: x.actualizadoPor?.email, fueraDeServicio: x.fueraDeServicio === true, ultimoVenc: e.ultimoVenc, ultimoFaltante: e.ultimoFaltante };
+  return { id: d.id, nombre: x.nombre ?? "Bolso", bolso: toBolso(x), encargados: encargadosDe.get(d.id) ?? [], ultimoPorEmail: x.actualizadoPor?.email, fueraDeServicio: x.fueraDeServicio === true, ultimoVenc: e.ultimoVenc, ultimoFaltante: e.ultimoFaltante };
 });
 
 const gerencia = [...ADMINS, ...equipoSnap.docs.filter((d) => d.data().rol === "gerencia").map((d) => d.id)];

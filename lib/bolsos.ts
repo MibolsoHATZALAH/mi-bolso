@@ -16,9 +16,14 @@ import type { Store } from "./data";
 import { ADMINS, EQUIPOS, type EquipoId } from "./config";
 export { ADMINS };
 
-export type Rol = "voluntario" | "gerencia";
-export type Acceso = { estado: "cargando" } | { estado: "pendiente" } | { estado: "miembro"; rol: Rol };
-export type Miembro = { email: string; rol: Rol; nombre: string };
+/** voluntario / dispatch: every bag · gerencia: every bag + lists, bags and team · encargado: only the bags the administrator gave them. */
+export type Rol = "voluntario" | "gerencia" | "encargado";
+export type Acceso = { estado: "cargando" } | { estado: "pendiente" } | { estado: "miembro"; rol: Rol; bolsos: string[] };
+export type Miembro = { email: string; rol: Rol; nombre: string; bolsos: string[] };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const rolDe = (x: any): Rol => (x?.rol === "gerencia" ? "gerencia" : x?.rol === "encargado" ? "encargado" : "voluntario");
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const bolsosDe = (x: any): string[] => (Array.isArray(x?.bolsos) ? x.bolsos.filter((b: unknown) => typeof b === "string") : []);
 export type Solicitud = { email: string; nombre: string; foto: string; t: Date };
 export type BolsoInst = {
   id: string; nombre: string; ubicacion: string; direccion: string; entrecalles: string; barrio: string; horario: string;
@@ -48,10 +53,10 @@ function toBolso(d: Record<string, any>): Bolso {
 /** Follows the viewer's place in the team. Someone not in it gets an access request filed for them. */
 export function subscribeAcceso(user: User, next: (a: Acceso) => void, onError: (e: Error) => void): Unsubscribe {
   const email = emailDe(user);
-  if (esAdmin(user)) { next({ estado: "miembro", rol: "gerencia" }); return () => {}; }
+  if (esAdmin(user)) { next({ estado: "miembro", rol: "gerencia", bolsos: [] }); return () => {}; }
   let pedido = false;
   return onSnapshot(doc(db(), "equipo", email), (snap) => {
-    if (snap.exists()) { next({ estado: "miembro", rol: snap.data().rol === "gerencia" ? "gerencia" : "voluntario" }); return; }
+    if (snap.exists()) { next({ estado: "miembro", rol: rolDe(snap.data()), bolsos: bolsosDe(snap.data()) }); return; }
     if (snap.metadata.fromCache) return; // wait for the server's answer
     next({ estado: "pendiente" });
     if (!pedido) {
@@ -64,7 +69,7 @@ export function subscribeAcceso(user: User, next: (a: Acceso) => void, onError: 
 /* ---------- Team (management) ---------- */
 export function subscribeEquipo(next: (m: Miembro[]) => void, onError: (e: Error) => void): Unsubscribe {
   return onSnapshot(collection(db(), "equipo"), (snap) => {
-    next(snap.docs.map((d) => ({ email: d.id, rol: d.data().rol === "gerencia" ? "gerencia" : "voluntario", nombre: d.data().nombre ?? "" } as Miembro))
+    next(snap.docs.map((d) => ({ email: d.id, rol: rolDe(d.data()), nombre: d.data().nombre ?? "", bolsos: bolsosDe(d.data()) } as Miembro))
       .sort((a, b) => (a.nombre || a.email).localeCompare(b.nombre || b.email, "es")));
   }, onError);
 }
@@ -78,7 +83,7 @@ export function subscribeSolicitudes(next: (s: Solicitud[]) => void, onError: (e
 }
 export async function aprobar(s: { email: string; nombre: string }, rol: Rol, por: User) {
   const batch = writeBatch(db());
-  batch.set(doc(db(), "equipo", s.email), { rol, nombre: s.nombre, agregadoPor: emailDe(por), agregado: serverTimestamp() });
+  batch.set(doc(db(), "equipo", s.email), { rol, nombre: s.nombre, agregadoPor: emailDe(por), agregado: serverTimestamp(), ...(rol === "encargado" ? { bolsos: [] } : {}) });
   batch.delete(doc(db(), "solicitudes", s.email));
   await batch.commit();
 }
@@ -86,11 +91,15 @@ export const rechazar = (email: string) => deleteDoc(doc(db(), "solicitudes", em
 export async function agregarMiembro(email: string, rol: Rol, por: User, nombre = "") {
   const e = email.trim().toLowerCase();
   const batch = writeBatch(db());
-  batch.set(doc(db(), "equipo", e), { rol, nombre: nombre.trim(), agregadoPor: emailDe(por), agregado: serverTimestamp() });
+  batch.set(doc(db(), "equipo", e), { rol, nombre: nombre.trim(), agregadoPor: emailDe(por), agregado: serverTimestamp(), ...(rol === "encargado" ? { bolsos: [] } : {}) });
   batch.delete(doc(db(), "solicitudes", e));
   await batch.commit();
 }
-export const cambiarRol = (email: string, rol: Rol) => updateDoc(doc(db(), "equipo", email), { rol });
+/** Leaving "encargado" drops the assigned bags; only the administrator can make someone encargado (firestore.rules). */
+export const cambiarRol = (email: string, rol: Rol, antes?: Rol) =>
+  updateDoc(doc(db(), "equipo", email), rol === "encargado" ? { rol, ...(antes !== "encargado" ? { bolsos: [] } : {}) } : { rol, ...(antes === "encargado" ? { bolsos: deleteField() } : {}) });
+/** Which bags an encargado looks after (administrator only). */
+export const asignarBolsos = (email: string, ids: string[]) => updateDoc(doc(db(), "equipo", email), { bolsos: [...new Set(ids)] });
 /** The name management sees for each person in the team. Administrators get a team entry the first time. */
 export const cambiarNombre = (email: string, nombre: string) =>
   ADMINS.includes(email) ? setDoc(doc(db(), "equipo", email), { rol: "gerencia", nombre: nombre.trim() }, { merge: true })
@@ -98,19 +107,32 @@ export const cambiarNombre = (email: string, nombre: string) =>
 export const quitarMiembro = (email: string) => deleteDoc(doc(db(), "equipo", email));
 
 /* ---------- Bags ---------- */
-export function subscribeBolsos(next: (b: BolsoInst[]) => void, onError: (e: Error) => void): Unsubscribe {
-  return onSnapshot(collection(db(), "bolsos"), (snap) => {
-    next(snap.docs.map((d) => {
-      const x = d.data({ serverTimestamps: "estimate" });
-      return { id: d.id, nombre: x.nombre ?? "Bolso", ubicacion: x.ubicacion ?? "", direccion: x.direccion ?? "", entrecalles: x.entrecalles ?? "", barrio: x.barrio ?? "", horario: x.horario ?? "",
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function aBolsoInst(id: string, x: Record<string, any>): BolsoInst {
+      return { id, nombre: x.nombre ?? "Bolso", ubicacion: x.ubicacion ?? "", direccion: x.direccion ?? "", entrecalles: x.entrecalles ?? "", barrio: x.barrio ?? "", horario: x.horario ?? "",
         bolso: toBolso(x),
         equipos: EQUIPOS.map((e) => e.id).filter((id) => Array.isArray(x.equipos) && x.equipos.includes(id)),
         geo: x.geo && Number.isFinite(x.geo.lat) && Number.isFinite(x.geo.lng) ? { lat: x.geo.lat, lng: x.geo.lng, dir: String(x.geo.dir ?? "") } : null,
         fueraDeServicio: x.fueraDeServicio === true, servicioPor: x.servicioCambio?.nombre ?? "",
         servicioDesde: (x.servicioCambio?.t as Timestamp)?.toDate?.() ?? null,
         actualizado: (x.actualizado as Timestamp)?.toDate?.() ?? null, por: x.actualizadoPor?.nombre ?? "" };
-    }).sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true })));
+}
+const porNombre = (a: BolsoInst, b: BolsoInst) => a.nombre.localeCompare(b.nombre, "es", { numeric: true });
+
+/** Every bag; or, for an encargado (`ids`), only theirs, one by one (the rules don't let them list the rest). */
+export function subscribeBolsos(next: (b: BolsoInst[]) => void, onError: (e: Error) => void, ids?: string[]): Unsubscribe {
+  if (!ids) return onSnapshot(collection(db(), "bolsos"), (snap) => {
+    next(snap.docs.map((d) => aBolsoInst(d.id, d.data({ serverTimestamps: "estimate" }))).sort(porNombre));
   }, onError);
+  const vistos = new Map<string, BolsoInst | null>();
+  const emitir = () => { if (vistos.size === ids.length) next([...vistos.values()].filter((b): b is BolsoInst => !!b).sort(porNombre)); };
+  if (!ids.length) { next([]); return () => {}; }
+  const offs = ids.map((id) => onSnapshot(bolsoRef(id), (snap) => {
+    if (snap.metadata.fromCache && !snap.exists()) return;
+    vistos.set(id, snap.exists() ? aBolsoInst(id, snap.data({ serverTimestamps: "estimate" })) : null);
+    emitir();
+  }, () => { vistos.set(id, null); emitir(); })); // a bag that was deleted (or not theirs anymore)
+  return () => offs.forEach((f) => f());
 }
 const limpio = (d: DatosBolso) => ({ nombre: d.nombre.trim(), ubicacion: d.ubicacion.trim(), direccion: d.direccion.trim(), entrecalles: d.entrecalles.trim(), barrio: d.barrio.trim(), horario: d.horario.trim() });
 export async function crearBolso(datos: DatosBolso, copiarDe?: Bolso) {

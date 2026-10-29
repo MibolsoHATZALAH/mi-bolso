@@ -60,7 +60,8 @@ Para pasar a Vercel más adelante: importar el repo en Vercel (rama `main`), agr
 https://mibolsohatzalah.github.io/mi-bolso/bolsos/ — la misma app, para los bolsos ubicados en lugares estratégicos. Mismo proyecto de Firebase y mismo login con Google.
 
 - **Equipo:** quien entra por primera vez queda como pedido de acceso (`solicitudes/{email}`) hasta que gerencia lo aprueba (`equipo/{email}`, rol `voluntario` o `gerencia`). Los administradores fijos están en `ADMINS` (lib/bolsos.ts) y en `firestore.rules`; tienen que coincidir.
-- **Voluntario:** ve todos los bolsos, registra usos, reposiciones y ajustes. Sólo puede cambiar el estado de los elementos (`valores`, `cant`, `venc`).
+- **Voluntario / despacho:** ve todos los bolsos, registra usos, reposiciones y ajustes. Sólo puede cambiar el estado de los elementos (`valores`, `cant`, `venc`).
+- **Encargado:** igual que voluntario pero sólo en los bolsos de `equipo/{email}.bolsos`; los demás no los puede leer (las reglas lo bloquean, la app se suscribe bolso por bolso). Recibe las alarmas de sus bolsos. Sólo el administrador (`ADMINS`) nombra encargados y les asigna bolsos (Equipo → Encargado → Elegir bolsos); gerencia no puede tocarlos.
 - **Gerencia:** ve el estado de todos los bolsos, copia una lista de reposición combinada, crea / renombra / elimina bolsos, edita la lista de elementos de cada uno y maneja el equipo.
 - **Datos:** `bolsos/{id}` (nombre, ubicación + inventario) y `bolsos/{id}/movimientos/{id}` (historial firmado con `por`). Los cambios de estado se guardan campo por campo (`cant.ft7`, …) para que dos personas trabajando en el mismo bolso no se pisen.
 - **Una sola lista para todos:** cuando gerencia edita la lista de un bolso (agregar, quitar, renombrar, tipo o mínimo), el cambio se repite en todos los bolsos (`aplicarListaEnOtros`). "Copiar esta lista a todos los bolsos" iguala las listas de una vez. Las cantidades y vencimientos de cada bolso se mantienen.

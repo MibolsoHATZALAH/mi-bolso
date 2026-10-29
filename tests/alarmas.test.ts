@@ -104,3 +104,13 @@ test("each app's alarms only reach that app's phones", () => {
   assert.equal(porUid.get("u3"), undefined);
   assert.equal(porEmail.get("x@gmail.com"), undefined);
 });
+
+test("a bag's encargados get its missing-items alarm; other encargados don't", () => {
+  const sede = compartido("sede", "Sede", (b) => setCant(b, "ft7", 1)!.next, { encargados: ["Juan@gmail.com"] });
+  const once = compartido("once", "Once", (b) => setCant(b, "ft7", 1)!.next, { encargados: ["maria@gmail.com"] });
+  const { avisos } = planificar({ personales: [], compartidos: [sede, once], gerencia: ["jefe@gmail.com"], now, hoy });
+  const para = (e: string) => avisos.filter((a) => a.para === `email:${e}` && a.tipo === "faltantes").map((a) => a.titulo);
+  assert.deepEqual(para("juan@gmail.com"), ["Faltantes en Sede"]);
+  assert.deepEqual(para("maria@gmail.com"), ["Faltantes en Once"]);
+  assert.deepEqual(para("jefe@gmail.com"), ["Faltantes en 2 bolsos"]);
+});

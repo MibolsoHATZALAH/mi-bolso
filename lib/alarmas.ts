@@ -2,7 +2,7 @@
 //
 //  - Vencimientos: every day, for any bag with medicines expired or expiring within 30 days.
 //      personal bag      → its owner
-//      shared bag        → management + whoever last updated that bag
+//      shared bag        → management + the bag's encargados + whoever last updated that bag
 //  - Faltantes (shared bags only): every FALTANTES_CADA_HORAS while the bag has missing items,
 //      → management + whoever last updated that bag.
 // Each person gets at most one "vencimientos" and one "faltantes" notification per run.
@@ -12,6 +12,8 @@ import { APP_URL, FALTANTES_CADA_HORAS } from "./config.ts";
 export type Personal = { uid: string; bolso: Bolso; ultimoVenc?: string };
 export type Compartido = {
   id: string; nombre: string; bolso: Bolso; ultimoPorEmail?: string; fueraDeServicio?: boolean;
+  /** People in charge of this bag (role "encargado"): they get its alarms too. */
+  encargados?: string[];
   ultimoVenc?: string; ultimoFaltante?: number; // ms
 };
 /** Recipient: "uid:<uid>" for a personal bag's owner, "email:<email>" for shared-bag recipients. */
@@ -49,7 +51,7 @@ export function planificar(
   };
   for (const b of compartidos) {
     if (b.fueraDeServicio) continue; // the team already knows it can't count on it
-    const destinatarios = [...new Set([...gerenciaSet, ...(b.ultimoPorEmail ? [b.ultimoPorEmail.toLowerCase()] : [])])];
+    const destinatarios = [...new Set([...gerenciaSet, ...(b.encargados ?? []).map((e) => e.toLowerCase()), ...(b.ultimoPorEmail ? [b.ultimoPorEmail.toLowerCase()] : [])])];
     if (b.ultimoVenc !== hoy) {
       const a = alertasVenc(b.bolso, now);
       if (a.length) {
