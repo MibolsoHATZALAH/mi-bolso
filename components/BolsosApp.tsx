@@ -57,7 +57,7 @@ export default function BolsosGate({ user }: { user: User }) {
     <div className="login"><div className="login-card">
       <h1>Pedido enviado</h1>
       <p>Entraste como <b>{user.email}</b>. La gerencia tiene que aprobarte para ver los bolsos de la institución. Esta pantalla se actualiza sola cuando te aprueben.</p>
-      <p className="small-note">¿Buscabas tu bolso personal? Está en <a href={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/`}>Mi Bolso</a>.</p>
+      <p className="small-note">¿Buscabas tu bolso personal? Está en <a href={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/personal/`}>Mi Bolso</a>.</p>
       <button className="btn" onClick={salir}>Entrar con otra cuenta</button>
     </div></div>
   );

@@ -14,7 +14,7 @@ find "$tmp" -mindepth 1 -maxdepth 1 ! -name .git ! -name _next -exec rm -rf {} +
 cp -a out/. "$tmp"/
 git -C "$tmp" add -A
 # sanity check: every page must point to scripts that are being published
-for f in "$tmp"/index.html "$tmp"/bolsos/index.html; do
+for f in "$tmp"/index.html "$tmp"/personal/index.html "$tmp"/bolsos/index.html; do
   for js in $(grep -o '/_next/static/chunks/[^"]*\.js' "$f" | sort -u); do
     [ -f "$tmp${js#/mi-bolso}" ] || [ -f "$tmp/${js#*/_next/../}" ] || [ -f "$tmp/_next/${js#*/_next/}" ] || { echo "FALTA $js en $f"; exit 1; }
   done

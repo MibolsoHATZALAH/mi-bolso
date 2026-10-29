@@ -35,7 +35,7 @@ export function planificar(
     if (!a.length) continue;
     const venc = a.filter((x) => x.dias < 0).length;
     avisos.push({
-      para: `uid:${p.uid}`, tipo: "venc", tag: "venc-personal", link: `${APP_URL}/`,
+      para: `uid:${p.uid}`, tipo: "venc", tag: "venc-personal", link: `${APP_URL}/personal/`,
       titulo: venc ? `Mi Bolso: ${venc === 1 ? "1 medicamento vencido" : `${venc} medicamentos vencidos`}` : "Mi Bolso: medicamentos por vencer",
       texto: lista(a.map((x) => `${x.it.nombre} ${textoVenc(x)}`)),
     });

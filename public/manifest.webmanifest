@@ -1,8 +1,8 @@
 {
   "name": "Mi Bolso Paramédico",
   "short_name": "Mi Bolso",
-  "start_url": "/mi-bolso/",
-  "scope": "/mi-bolso/",
+  "start_url": "/mi-bolso/personal/",
+  "scope": "/mi-bolso/personal/",
   "display": "standalone",
   "background_color": "#EEF2F1",
   "theme_color": "#0E5568",
@@ -20,5 +20,6 @@
       "type": "image/png",
       "purpose": "any"
     }
-  ]
+  ],
+  "id": "/mi-bolso/"
 }

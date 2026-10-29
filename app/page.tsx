@@ -1,23 +1,12 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { signOut } from "firebase/auth";
-import { fb } from "@/lib/firebase";
-import { ensureProfile, personalStore } from "@/lib/data";
-import { obtenerListaEquipo } from "@/lib/bolsos";
-import type { Catalog } from "@/lib/inventory";
-import InventoryApp from "@/components/InventoryApp";
-import Login, { UserChip, useUser } from "@/components/Login";
-import AlarmasPush from "@/components/AlarmasPush";
+// Mi Bolso (personal) lives at /personal/ so its installed app doesn't swallow /bolsos/ on Android
+// (an installed web app owns every page under its scope). Old links and old home-screen icons land
+// here and are sent on, keeping #hash and ?query.
+import { useEffect } from "react";
 
-export default function Page() {
-  const user = useUser((u) => { ensureProfile(u).catch(() => {}); });
-  const store = useMemo(() => (user ? personalStore(user.uid) : null), [user]);
-  // the institution's list, so this bag can use the same one (only for people in the team)
-  const [listaEquipo, setListaEquipo] = useState<Catalog | null>(null);
-  useEffect(() => { if (user) obtenerListaEquipo().then(setListaEquipo); }, [user]);
+const DESTINO = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/personal/`;
 
-  if (user === undefined) return <div className="splash">Cargando…</div>;
-  if (!user || !store) return <Login title="Mi Bolso" text="Inventario de tu bolso de paramédico: lo que falta, lo que usaste en cada emergencia y lo que repusiste." />;
-
-  return <InventoryApp store={store} title="Mi Bolso" top={<UserChip user={user} onSignOut={() => signOut(fb().auth)} />} bandExtra={<AlarmasPush user={user} app="personal" />} listaEquipo={listaEquipo} />;
+export default function Raiz() {
+  useEffect(() => { window.location.replace(DESTINO + window.location.search + window.location.hash); }, []);
+  return <div className="splash"><a href={DESTINO}>Abrir Mi Bolso</a></div>;
 }
