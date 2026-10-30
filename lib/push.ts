@@ -4,7 +4,7 @@
 // sends personal alarms only to "personal" tokens and shared-bag alarms only to "bolsos" tokens.
 //
 // The two apps are kept apart on the phone too: each registers its own service worker with its own
-// scope (/mi-bolso/ and /mi-bolso/bolsos/), so each gets a different push token even in the same browser.
+// scope (/mi-bolso/ for the personal app at /mi-bolso/personal/, and /mi-bolso/bolsos/), so each gets a different push token even in the same browser.
 import { getMessaging, getToken, isSupported, onMessage } from "firebase/messaging";
 import { doc, setDoc, updateDoc, serverTimestamp, arrayRemove } from "firebase/firestore";
 import type { User } from "firebase/auth";
@@ -13,7 +13,7 @@ import { VAPID_KEY } from "./config";
 import { sonarAlarma } from "./sonido";
 
 export type App = "personal" | "bolsos";
-export type EstadoPush = "cargando" | "instalar" | "no" | "apagado" | "bloqueado" | "activo";
+export type EstadoPush = "cargando" | "instalar" | "no" | "apagado" | "permitido" | "bloqueado" | "activo";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const scope = (app: App) => (app === "bolsos" ? `${BASE}/bolsos/` : `${BASE}/`);
@@ -34,6 +34,8 @@ export async function estadoPush(app: App): Promise<EstadoPush> {
   if (!ok) return esIOS() && !instalada() ? "instalar" : "no";
   if (Notification.permission === "denied") return "bloqueado";
   if (Notification.permission === "granted" && (leer(lsKey(app)) || leer(LS_VIEJO))) return "activo";
+  // permission already given (in the other app, or before the phone forgot the token): turn them on without asking
+  if (Notification.permission === "granted") return "permitido";
   return "apagado";
 }
 

@@ -625,3 +625,15 @@ textarea.copy-fallback{width:100%;min-height:140px;margin-top:10px;font-family:v
 .enc-barrio{color:var(--muted);font-weight:400;font-size:13px}
 span.servicio.solo-ver{cursor:default}
 .servicio.solo-ver:active{transform:none}
+/* "Activá las alarmas": comes up on opening the app until alarms are on */
+.alarmas-aviso{position:fixed;inset:0;z-index:40;display:flex;align-items:flex-end;justify-content:center;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));
+  background:color-mix(in srgb,#000 45%,transparent);animation:aviso-in .25s ease-out}
+.alarmas-aviso-card{width:100%;max-width:420px;background:var(--bg);border-radius:24px;padding:24px 20px 14px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;
+  box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.alarmas-aviso-ico{font-size:44px;line-height:1}
+.alarmas-aviso-card h2{margin:0;font-family:var(--f-display);font-size:24px;font-weight:800;letter-spacing:-.02em}
+.alarmas-aviso-card p{margin:0;font-size:16px;color:var(--muted);line-height:1.4}
+.alarmas-aviso-card .btn.grande{width:100%;font-size:17px;padding:14px;margin-top:6px}
+.alarmas-aviso-card .link-btn{padding:10px;font-size:15px}
+@keyframes aviso-in{from{opacity:0}to{opacity:1}}
+@media (min-width:600px){.alarmas-aviso{align-items:center}}
