@@ -17,17 +17,42 @@ const config = {
 
 export const firebaseConfigured = Boolean(config.apiKey && config.projectId && config.appId);
 
+const SIN_CACHE = "firestore-sin-cache";
+/**
+ * Chrome sometimes leaves the offline cache (IndexedDB) stuck: opening it never finishes, Firestore waits for it
+ * forever and the app stays on "Cargando…" (seen after a crash or with an old window of the app still open).
+ * If the cache doesn't open within a few seconds, reload once without it (this tab only; the next visit tries again).
+ */
+function vigilarCache(projectId: string) {
+  if (typeof indexedDB === "undefined") return;
+  let listo = false;
+  const t = setTimeout(() => {
+    if (listo) return;
+    try { sessionStorage.setItem(SIN_CACHE, "1"); } catch { return; }
+    location.reload();
+  }, 6000);
+  try {
+    const q = indexedDB.open(`firestore/[DEFAULT]/${projectId}/main`);
+    const fin = () => { listo = true; clearTimeout(t); };
+    q.onsuccess = () => { fin(); q.result.close(); };
+    q.onerror = fin; // an error is reported by Firestore itself, which then works without the cache
+  } catch { listo = true; clearTimeout(t); }
+}
+
 let cached: { app: FirebaseApp; auth: Auth; db: Firestore; google: GoogleAuthProvider } | null = null;
 
 export function fb() {
   if (cached) return cached;
   const app = getApps()[0] ?? initializeApp(config);
   let db: Firestore;
+  const sinCache = (() => { try { return sessionStorage.getItem(SIN_CACHE) === "1"; } catch { return false; } })();
   try {
+    if (sinCache) throw new Error("memoria");
     // offline cache: the bag can be updated without signal and syncs when the connection comes back
     db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+    vigilarCache(config.projectId);
   } catch {
-    db = getFirestore(app);
+    db = getFirestore(app); // in-memory cache only
   }
   const google = new GoogleAuthProvider();
   google.setCustomParameters({ prompt: "select_account" });
